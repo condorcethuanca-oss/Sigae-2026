@@ -1,0 +1,1019 @@
+# SIGAE — IMPLEMENTACIÓN COMPLETA DEL SISTEMA KÁRDEX ESCOLAR Y NOTIFICACIONES A PADRES DE FAMILIA
+
+## INSTRUCCIÓN PRINCIPAL
+
+Actúa como arquitecto de software sénior, desarrollador full-stack especializado en React, TypeScript, Firebase Authentication, Cloud Firestore, Firebase Admin SDK, seguridad, gestión académica y diseño UX/UI.
+
+Trabaja sobre la aplicación web existente SIGAE — Sistema Integral de Gestión Académica Escolar, de la U.E. Luis Espinal Tarde de Collpani, Bolivia, código SIE 80730142.
+
+Quiero implementar un nuevo módulo institucional llamado **Kárdex Escolar y Seguimiento del Comportamiento**.
+
+Este sistema debe permitir a los profesores informar a los padres sobre el comportamiento de sus hijos, las tareas que no presentaron y las situaciones escolares que requieren atención.
+
+**NO QUIERO UN KÁRDEX DECORATIVO NI UN SISTEMA QUE SIMULE NOTIFICACIONES.**
+
+Todas las operaciones deben estar conectadas a Firebase, con datos reales, permisos correctos, confirmación de escritura y trazabilidad.
+
+Conserva los paneles, el inicio de sesión, las asignaciones docentes, los horarios, las matrículas y los vínculos familiares existentes.
+
+No reconstruyas SIGAE desde cero.
+
+---
+
+# PARTE 1. OBJETIVO DEL KÁRDEX
+
+## 1. ¿Para qué servirá?
+
+El Kárdex permitirá:
+
+1. Registrar observaciones sobre el comportamiento de un estudiante.
+2. Notificar a sus padres cuando no presente tareas.
+3. Registrar llamadas de atención justificadas.
+4. Comunicar situaciones que requieran seguimiento.
+5. Solicitar reuniones con padres o tutores.
+6. Registrar aspectos positivos y mejoras de comportamiento.
+7. Consultar el historial escolar correspondiente.
+8. Permitir respuestas y aclaraciones familiares.
+9. Organizar notificaciones según su nivel de importancia.
+10. Mantener un historial de las acciones realizadas.
+
+El Kárdex no sustituye el registro de asistencia ni las calificaciones.
+
+Una tarea no realizada puede generar un aviso académico, pero no debe convertirse automáticamente en una falta grave de comportamiento.
+
+No utilices una clasificación global permanente de un estudiante como «bueno», «malo» o «problemático».
+
+---
+
+# PARTE 2. LOS CUATRO NIVELES DE NOTIFICACIÓN
+
+## 2. Escala de atención del Kárdex
+
+El sistema tendrá cuatro niveles claramente diferenciados.
+
+Estos niveles son una clasificación funcional propuesta para SIGAE. Antes de utilizarlos como procedimiento disciplinario oficial, Dirección debe validarlos conforme al reglamento institucional.
+
+### NIVEL 1 — AVISO INFORMATIVO
+
+Color de identificación: verde.
+
+Ejemplos:
+- No presentó una tarea.
+- Olvidó un material solicitado.
+- Tiene un trabajo pendiente.
+- Existe un compromiso académico por completar.
+
+Funcionamiento:
+
+El profesor registra una observación objetiva.
+
+SIGAE guarda el registro y genera una notificación interna para los padres autorizados, según la política de publicación.
+
+El padre podrá leerla y consultar qué tarea está pendiente.
+
+Este nivel no genera sanciones ni citaciones automáticas.
+
+### NIVEL 2 — LLAMADA DE ATENCIÓN
+
+Color de identificación: amarillo.
+
+Ejemplos:
+- Interrumpió reiteradamente la clase.
+- Incumplió un acuerdo de convivencia.
+- Se registró una conducta que requiere corrección o acompañamiento.
+
+Funcionamiento:
+
+El profesor registra lo ocurrido, indicando fecha, clase y descripción objetiva.
+
+SIGAE guarda el registro y permite realizar el seguimiento.
+
+Cuando corresponda comunicarlo a la familia, genera una notificación para los tutores autorizados.
+
+El padre podrá consultar el detalle y responder.
+
+### NIVEL 3 — ATENCIÓN FAMILIAR
+
+Color de identificación: naranja.
+
+Ejemplos:
+- Se requiere una conversación con la familia.
+- Persisten dificultades previamente comunicadas y verificadas.
+- Es necesario establecer acuerdos de seguimiento.
+
+Funcionamiento:
+
+El profesor registra la situación y solicita intervención o revisión de Dirección cuando corresponda.
+
+La institución puede solicitar una reunión con el padre.
+
+El padre recibe una notificación y puede consultar los detalles autorizados, responder o ver la citación.
+
+No conviertas automáticamente varios avisos de nivel 1 en una falta de nivel 3.
+
+### NIVEL 4 — ATENCIÓN PRIORITARIA
+
+Color de identificación: rojo.
+
+Se reserva para situaciones de seguridad o convivencia que requieren intervención institucional pronta.
+
+Funcionamiento:
+
+El profesor registra o comunica la situación a la autoridad responsable.
+
+SIGAE genera una alerta institucional prioritaria.
+
+Dirección debe atender el caso mediante los protocolos oficiales del colegio.
+
+No dependas exclusivamente de una notificación digital para una situación urgente.
+
+No permitas que el sistema imponga sanciones automáticas.
+
+La familia recibirá únicamente la información que corresponda comunicar siguiendo los procedimientos institucionales.
+
+---
+
+# PARTE 3. KÁRDEX EN EL PANEL DEL PROFESOR
+
+## 3. Nueva sección del menú
+
+Agrega al panel docente una opción:
+
+**Kárdex y Comportamiento**
+
+Debe integrarse al menú lateral existente sin romper los módulos de clases, estudiantes, asistencia, notas, horario o mensajería.
+
+### Al pulsar el botón
+
+El sistema debe:
+
+1. Verificar Firebase Authentication.
+2. Obtener el UID real del profesor.
+3. Comprobar que su rol sea `profesor`.
+4. Confirmar que su cuenta esté aprobada.
+5. Recuperar sus asignaciones oficiales.
+6. Mostrar únicamente sus cursos autorizados.
+
+El profesor no puede consultar ni registrar observaciones de cursos ajenos.
+
+## 4. Vista principal del profesor
+
+Mostrar:
+
+- Selector de curso.
+- Selector de materia asignada.
+- Lista de estudiantes.
+- Buscador por nombre.
+- Historial de observaciones autorizadas.
+- Botón «Nueva observación».
+
+Las listas deben proceder de las matrículas oficiales almacenadas en Firestore.
+
+No inventes estudiantes ni copies sus datos dentro del componente.
+
+## 5. Botón «Nueva observación»
+
+Al presionarlo, se abre un formulario completo.
+
+### Datos automáticos
+
+- Profesor autenticado.
+- UID del profesor.
+- Fecha y hora.
+- Curso y paralelo.
+- Materia.
+- Gestión académica.
+- Identificador del estudiante seleccionado.
+
+### Campos del formulario
+
+**Estudiante:** seleccionado de la nómina oficial.
+
+**Tipo de observación:**
+- Comportamiento en clase.
+- Tarea no presentada.
+- Incumplimiento de un acuerdo escolar.
+- Llamada de atención.
+- Solicitud de seguimiento familiar.
+- Aspecto positivo.
+- Otra observación autorizada.
+
+**Nivel de atención:**
+- Nivel 1 — Informativo.
+- Nivel 2 — Llamada de atención.
+- Nivel 3 — Atención familiar.
+- Nivel 4 — Atención prioritaria.
+
+**Descripción de lo ocurrido:** texto obligatorio y objetivo.
+
+**Fecha del hecho:** seleccionable cuando el registro se hace posteriormente.
+
+**Tarea relacionada:** opcional cuando el motivo sea académico.
+
+**Acción o acuerdo propuesto:** opcional.
+
+**¿Solicitar revisión de Dirección?:** disponible según los permisos y el nivel.
+
+El sistema debe advertir cuando la descripción esté vacía o resulte insuficiente.
+
+No publiques nombres de otros estudiantes ni datos personales de terceros dentro de observaciones familiares.
+
+## 6. Botones del formulario
+
+### «Guardar borrador»
+
+Guarda la observación en estado `draft`.
+
+No envía una notificación al padre.
+
+### «Vista previa»
+
+Muestra exactamente qué información recibiría la familia.
+
+No crea ni publica el aviso.
+
+### «Enviar notificación»
+
+Antes de enviar debe:
+
+1. Verificar la asignación oficial del profesor.
+2. Verificar que el estudiante pertenece al curso correspondiente.
+3. Validar el contenido.
+4. Comprobar la política de publicación aplicable al nivel.
+5. Confirmar qué tutores están autorizados para recibir información.
+6. Guardar o publicar la observación según corresponda.
+7. Crear las notificaciones internas correspondientes.
+8. Mostrar una confirmación solo cuando la operación realmente termine.
+
+Si un nivel requiere revisión de Dirección, el botón debe enviar el registro a revisión y no saltarse la autorización.
+
+### «Solicitar intervención de Dirección»
+
+Crea una solicitud de revisión vinculada al Kárdex.
+
+La directora recibirá la alerta correspondiente.
+
+### «Cancelar»
+
+Cierra el formulario, avisando si hay cambios sin guardar.
+
+### «Ver historial»
+
+Abre los registros del estudiante o curso que el profesor tiene autorización para consultar.
+
+---
+
+# PARTE 4. FUNCIONAMIENTO ESPECIAL PARA TAREAS NO PRESENTADAS
+
+## 7. Notificación por incumplimiento de tareas
+
+Esta función debe ser sencilla y rápida.
+
+Ejemplo:
+
+Un profesor de Matemáticas abre 6.º A, selecciona a un estudiante y presiona «Registrar tarea no presentada».
+
+Formulario:
+
+- Materia: Matemáticas.
+- Curso: 6.º A.
+- Estudiante: seleccionado.
+- Actividad: nombre de la tarea.
+- Fecha de entrega prevista.
+- Motivo: tarea no presentada.
+- Comentario del profesor.
+- Estado de la actividad.
+- Nivel inicial sugerido: informativo.
+
+El profesor puede guardar el aviso o publicarlo según las reglas institucionales.
+
+El padre recibe una notificación como:
+
+**SIGAE — Tarea no presentada**
+
+«Se ha registrado una tarea pendiente de Matemáticas. Ingresa a SIGAE para consultar los detalles».
+
+Dentro del panel, el padre podrá consultar:
+
+- Nombre de la materia.
+- Actividad pendiente.
+- Fecha correspondiente.
+- Descripción.
+- Profesor responsable.
+- Estado del seguimiento.
+
+Si el estudiante presenta posteriormente la tarea, el profesor podrá actualizar el estado académico de la actividad y registrar la resolución del aviso.
+
+No borres automáticamente el historial original.
+
+No transformes una tarea pendiente en sanción disciplinaria sin revisión de la situación.
+
+---
+
+# PARTE 5. KÁRDEX EN EL PANEL DEL PADRE
+
+## 8. Nueva opción familiar
+
+Agrega al menú del padre:
+
+**Comportamiento de mi hijo**
+
+También debe existir un acceso desde la sección «Mis hijos».
+
+Al abrirlo:
+
+1. Recupera el UID del padre.
+2. Verifica su sesión.
+3. Consulta sus vínculos familiares aprobados.
+4. Muestra únicamente a sus hijos autorizados.
+5. Permite seleccionar uno.
+6. Recupera las observaciones comunicables de ese estudiante.
+
+Si tiene dos o más hijos, cada uno debe tener su historial independiente.
+
+## 9. Diseño de la pantalla
+
+Encabezado:
+
+**Comportamiento de mi hijo**
+
+Subtítulo:
+
+«Consulta las observaciones y comunicaciones escolares».
+
+Mostrar:
+
+- Nombre del hijo seleccionado.
+- Curso y paralelo.
+- Gestión académica.
+- Observaciones recientes.
+- Avisos pendientes de leer.
+- Seguimientos abiertos.
+- Comunicaciones y citaciones.
+- Aspectos positivos registrados.
+
+No muestres puntuaciones inventadas de comportamiento.
+
+### Filtros
+
+- Todas las observaciones.
+- Tareas pendientes.
+- Comportamiento.
+- Citaciones.
+- Seguimiento.
+- Aspectos positivos.
+- Por nivel de atención.
+- Por fecha.
+
+## 10. Botón «Ver observación»
+
+Al pulsarlo se abre el detalle:
+
+- Fecha.
+- Materia.
+- Docente responsable.
+- Tipo.
+- Nivel.
+- Descripción comunicable.
+- Estado del seguimiento.
+- Acuerdos autorizados.
+- Respuestas familiares.
+
+No muestres notas internas confidenciales que no hayan sido autorizadas para comunicación familiar.
+
+## 11. Botón «Marcar como leído»
+
+Actualiza el estado de lectura de la notificación correspondiente a ese padre.
+
+No modifica los estados de lectura de otros tutores.
+
+No significa que el padre esté de acuerdo ni que acepte una sanción.
+
+## 12. Botón «Responder al profesor»
+
+Abre una conversación autorizada vinculada a la observación.
+
+El padre puede responder mediante texto.
+
+El mensaje debe guardarse con:
+
+- ID de conversación.
+- UID del remitente.
+- UID del destinatario.
+- Referencia al Kárdex.
+- Fecha.
+- Texto.
+- Estado de lectura.
+
+La respuesta debe aparecer al profesor correspondiente.
+
+No incluyas llamadas de voz ni videollamadas.
+
+## 13. Botón «Solicitar aclaración»
+
+Permite al padre pedir una explicación o revisión.
+
+La solicitud queda asociada al registro.
+
+El profesor o la Dirección, según corresponda, podrá responder.
+
+La aclaración no borra ni modifica automáticamente el registro original.
+
+## 14. Botón «Ver citación»
+
+Si existe una citación oficial, debe mostrar:
+
+- Motivo general autorizado.
+- Fecha.
+- Hora.
+- Lugar.
+- Responsable institucional.
+- Estado.
+
+Permite confirmar recepción o solicitar coordinación cuando esté habilitado.
+
+No inventes reuniones que no hayan sido registradas.
+
+---
+
+# PARTE 6. SISTEMA DE NOTIFICACIONES POR NIVELES
+
+## 15. Bandeja interna de notificaciones
+
+SIGAE debe tener una bandeja de notificaciones funcional para profesores, padres y Dirección.
+
+La campana ubicada en el encabezado debe funcionar realmente.
+
+### Al pulsar la campana
+
+Debe mostrar:
+
+- Notificaciones no leídas.
+- Notificaciones recientes.
+- Tipo de aviso.
+- Nivel de atención.
+- Fecha.
+- Estado.
+- Acceso al detalle.
+
+### Botón «Ver todas»
+
+Abre la bandeja completa.
+
+### Botón «Marcar como leído»
+
+Actualiza solamente la notificación del destinatario autenticado.
+
+### Botón «Marcar todas como leídas»
+
+Actualiza las notificaciones del usuario de manera autorizada.
+
+### Al pulsar una notificación
+
+Debe dirigir a la pantalla correspondiente.
+
+Ejemplo:
+
+Notificación de Kárdex
+→ seleccionar el hijo correcto
+→ abrir la observación autorizada.
+
+No debe redirigir al panel de la directora.
+
+## 16. Estados de una notificación
+
+Mantén separados los estados de publicación, entrega, lectura y seguimiento.
+
+### Publicación
+
+- `draft`
+- `pending_review`
+- `approved`
+- `published`
+- `rejected`
+
+### Entrega
+
+- `pending`
+- `queued`
+- `sent`
+- `delivered`, solo si existe confirmación real.
+- `failed`
+
+### Lectura
+
+- `unread`
+- `read`
+
+### Seguimiento
+
+- `open`
+- `awaiting_response`
+- `under_review`
+- `resolved`
+- `closed`
+
+No confundas:
+
+- Publicada con enviada.
+- Enviada con entregada.
+- Entregada con leída.
+- Leída con respondida.
+- Respondida con resuelta.
+
+No declares una notificación como entregada al teléfono solo porque Firebase Cloud Messaging aceptó la solicitud.
+
+## 17. Escala visual de notificaciones
+
+Utiliza:
+
+- Nivel 1: verde.
+- Nivel 2: amarillo.
+- Nivel 3: naranja.
+- Nivel 4: rojo.
+
+Incluye siempre el texto del nivel, no solamente el color.
+
+Los colores deben ayudar a distinguir prioridades, pero no deben usarse para etiquetar permanentemente al estudiante.
+
+El padre debe poder abrir el detalle para comprender qué ocurrió.
+
+## 18. Notificaciones push
+
+Primera etapa obligatoria:
+
+Notificaciones internas guardadas realmente en Cloud Firestore.
+
+Segunda etapa:
+
+Integración con Firebase Cloud Messaging, si la infraestructura permite notificaciones push.
+
+Debes:
+
+- Solicitar permiso explícito al usuario.
+- Registrar dispositivos autorizados cuando corresponda.
+- Configurar correctamente el servicio de mensajería.
+- Proteger tokens de dispositivos.
+- Evitar enviar información sensible en la vista previa de pantalla bloqueada.
+- Gestionar fallos y reintentos.
+- No enviar avisos duplicados.
+- Permitir desactivar notificaciones no esenciales.
+
+Tercera etapa opcional:
+
+Correo electrónico y SMS, solamente cuando exista un proveedor configurado, consentimiento y una infraestructura autorizada.
+
+No afirmes que ya puedes enviar SMS únicamente porque tienes guardado el teléfono del padre.
+
+---
+
+# PARTE 7. KÁRDEX EN EL PANEL DE DIRECCIÓN
+
+## 19. Módulo «Gestión de Kárdex»
+
+Agrega al panel de Dirección una sección:
+
+**Gestión de Kárdex y Convivencia**
+
+Mostrar:
+
+- Observaciones pendientes de revisión.
+- Seguimientos abiertos.
+- Casos que requieren atención familiar.
+- Solicitudes de aclaración.
+- Citaciones.
+- Historiales autorizados.
+- Reportes por curso y período.
+
+No conviertas el Kárdex en una lista pública de estudiantes con supuesta mala conducta.
+
+## 20. Botones de Dirección
+
+### «Revisar observación»
+
+Abre el registro y su contexto.
+
+### «Solicitar aclaración al docente»
+
+Permite pedir información adicional sin publicar prematuramente la observación.
+
+### «Autorizar comunicación familiar»
+
+Publica la versión comunicable a los tutores verificados.
+
+### «Devolver para corrección»
+
+Solicita al profesor ajustar datos incompletos o inexactos.
+
+### «Registrar acuerdo»
+
+Guarda un acuerdo de seguimiento con responsable y fecha.
+
+### «Programar citación»
+
+Crea una reunión institucional y notifica al padre cuando corresponda.
+
+### «Cerrar seguimiento»
+
+Cierra el caso con una anotación de resolución.
+
+### «Ver historial»
+
+Consulta los cambios autorizados.
+
+Las medidas institucionales deben seguir el reglamento del colegio y no aplicarse automáticamente por una puntuación o acumulación de avisos.
+
+---
+
+# PARTE 8. ARQUITECTURA FIREBASE Y BACKEND
+
+## 21. Inspeccionar el sistema existente
+
+Antes de crear nuevas colecciones, revisa la estructura real de Firestore.
+
+SIGAE ha utilizado nombres como:
+
+- `/usuarios`
+- `/users`
+- `/profesores`
+- `/teachers`
+- `/horarios`
+- `/asistencia`
+- `/attendance_sessions`
+
+No crees estructuras paralelas sin revisar lo existente.
+
+Identifica la ruta institucional vigente, incluida cualquier estructura bajo:
+
+`colegios/luis-espinal-collpani/`
+
+Mantén una única fuente de verdad para cada tipo de documento.
+
+No migres datos institucionales sin planificación y autorización.
+
+## 22. Modelo conceptual para el Kárdex
+
+Adapta los siguientes nombres a la estructura institucional ya existente.
+
+### `kardexRecords/{recordId}`
+
+Campos:
+
+- `recordId`
+- `schoolId`
+- `academicYear`
+- `studentId`
+- `courseId`
+- `subjectId`
+- `teacherUid`
+- `assignmentId`
+- `category`
+- `severityLevel`
+- `description`
+- `occurredAt`
+- `createdAt`
+- `updatedAt`
+- `publicationStatus`
+- `followUpStatus`
+- `requiresDirectorReview`
+- `familyVisible`
+- `reviewedBy`
+- `reviewedAt`
+
+No utilices el RUDE o CI como identificador público.
+
+Los campos sensibles estarán protegidos según los permisos institucionales.
+
+### `kardexFollowUps/{followUpId}`
+
+Campos:
+
+- `recordId`
+- `authorUid`
+- `actionType`
+- `description`
+- `createdAt`
+- `status`
+
+Permite guardar:
+
+- Aclaraciones.
+- Acuerdos.
+- Respuestas.
+- Revisiones.
+- Resoluciones.
+- Seguimientos.
+
+### `notifications/{notificationId}`
+
+Campos:
+
+- `notificationId`
+- `recipientUid`
+- `senderUid`
+- `studentId`
+- `recordId`
+- `type`
+- `severityLevel`
+- `title`
+- `safePreview`
+- `publicationStatus`
+- `deliveryStatus`
+- `readStatus`
+- `createdAt`
+- `readAt`
+- `destination`
+
+Debe existir una notificación independiente por destinatario autorizado.
+
+### `notificationDeliveries/{deliveryId}`
+
+Campos:
+
+- `notificationId`
+- `channel`
+- `status`
+- `attempts`
+- `lastAttemptAt`
+- `providerMessageId`, cuando corresponda
+- `errorCode`, si existe
+
+No registres contraseñas, tokens secretos ni información privada innecesaria en logs.
+
+### `familyMeetings/{meetingId}`
+
+Para citaciones:
+
+- `meetingId`
+- `studentId`
+- `parentUid`
+- `relatedRecordId`
+- `scheduledAt`
+- `location`
+- `responsibleUid`
+- `status`
+- `createdAt`
+
+Si ya existen colecciones equivalentes, reutilízalas.
+
+## 23. Relaciones entre documentos
+
+Un estudiante puede tener muchos registros de Kárdex.
+
+Cada registro pertenece a un estudiante específico.
+
+Un profesor puede crear registros solamente para estudiantes de cursos y materias autorizados.
+
+Un registro puede generar diferentes notificaciones para tutores autorizados.
+
+Cada notificación tiene un destinatario y sus propios estados.
+
+Un registro puede tener varios seguimientos.
+
+Una citación puede estar vinculada con una observación específica.
+
+Las relaciones familiares deben comprobarse mediante vínculos aprobados.
+
+No permitas que un usuario seleccione arbitrariamente el UID de otro padre para enviarle información privada.
+
+## 24. Flujo del backend
+
+Al registrar una observación:
+
+Frontend del profesor
+→ Firebase Authentication
+→ Verificación de UID y permisos
+→ Validación de asignación docente
+→ Validación del estudiante y curso
+→ Escritura del Kárdex en Firestore
+→ Revisión institucional cuando corresponda
+→ Publicación autorizada
+→ Creación de notificaciones para tutores autorizados
+→ Actualización de bandejas.
+
+Las escrituras relacionadas deben ser consistentes.
+
+Utiliza transacciones o lotes cuando corresponda.
+
+Para entregas externas, utiliza un proceso idempotente que pueda reintentarse sin duplicar notificaciones.
+
+### Infraestructura
+
+Si ya existe un backend seguro con Firebase Admin SDK, reutilízalo.
+
+Si no existe, comprueba qué operaciones pueden implementarse de forma segura con el SDK de Firebase y las reglas de Firestore.
+
+Las operaciones administrativas privilegiadas, las entregas push y las autorizaciones sensibles no deben simularse desde el navegador.
+
+Comprueba el plan de Firebase y la infraestructura disponible antes de proponer Cloud Functions u otros servicios que requieran facturación.
+
+No actives servicios de pago ni modifiques el plan sin autorización.
+
+## 25. Reglas de seguridad
+
+- Profesor: solo registros autorizados de sus asignaciones.
+- Padre: solo registros comunicables de hijos verificados.
+- Director: acceso institucional según sus funciones.
+- Alumno: acceso únicamente a información propia expresamente autorizada.
+- Nadie puede leer datos de estudiantes ajenos.
+- Los usuarios no pueden autoaprobar observaciones que requieren revisión.
+- Los padres no pueden modificar observaciones docentes.
+- Los profesores no pueden modificar registros de otros docentes sin autorización.
+- Los estados de entrega no pueden falsificarse desde el navegador.
+- Los registros cerrados deben conservar un historial de auditoría y rectificación.
+
+Prueba las reglas antes de publicarlas.
+
+No despliegues cambios a producción sin autorización.
+
+---
+
+# PARTE 9. EXPERIENCIA DE USUARIO
+
+## 26. Diseño visual
+
+Conserva el estilo oscuro de los paneles SIGAE.
+
+Utiliza:
+
+- Menú lateral.
+- Tarjetas legibles.
+- Acentos violetas y azules.
+- Íconos claros.
+- Formularios organizados.
+- Etiquetas de nivel.
+- Fecha y materia visibles.
+- Estados de seguimiento.
+- Indicadores de notificaciones pendientes.
+
+No llenes el panel con estadísticas inventadas.
+
+Las tarjetas de observaciones deben mostrar una descripción breve, con opción de abrir el detalle.
+
+En móviles, el Kárdex debe poder utilizarse fácilmente con botones suficientemente grandes y navegación clara.
+
+## 27. Estados vacíos
+
+Si un estudiante no tiene observaciones comunicables, muestra:
+
+«No hay observaciones registradas para este período».
+
+Si una tarea todavía está pendiente de revisión:
+
+«Esta observación está en proceso de seguimiento».
+
+Si no existe una citación:
+
+«No tienes citaciones pendientes».
+
+Nunca generes automáticamente registros para rellenar la pantalla.
+
+---
+
+# PARTE 10. PRUEBAS OBLIGATORIAS
+
+## 28. Pruebas del profesor
+
+1. Entra con su cuenta aprobada.
+2. Abre Kárdex.
+3. Ve sus cursos reales.
+4. Selecciona un estudiante autorizado.
+5. Registra una tarea no presentada.
+6. Guarda un borrador.
+7. Recupera el borrador.
+8. Publica un aviso autorizado.
+9. Firestore guarda el registro.
+10. Los tutores autorizados reciben el aviso interno.
+11. Un profesor ajeno no puede abrir ni modificar el registro.
+12. Una operación fallida no produce un falso mensaje de éxito.
+
+## 29. Pruebas del padre
+
+1. Inicia sesión.
+2. Abre «Comportamiento de mi hijo».
+3. Selecciona un hijo vinculado.
+4. Ve las observaciones comunicables.
+5. Abre una notificación.
+6. La marca como leída.
+7. Responde al profesor.
+8. Solicita una aclaración.
+9. Consulta una citación real.
+10. No puede acceder al Kárdex de estudiantes ajenos.
+
+## 30. Pruebas de Dirección
+
+1. Recibe registros pendientes de revisión.
+2. Abre una observación.
+3. Solicita aclaraciones.
+4. Autoriza una comunicación familiar.
+5. Registra acuerdos.
+6. Programa una citación.
+7. Cierra un seguimiento.
+8. Consulta el historial de cambios.
+9. No se altera su sesión al aprobar o revisar registros.
+
+## 31. Pruebas de notificaciones
+
+1. Una notificación aparece en la bandeja real.
+2. Su contador se actualiza.
+3. Se abre el detalle correcto.
+4. El estado leído se guarda.
+5. Las notificaciones pertenecen al destinatario correcto.
+6. No hay envíos duplicados.
+7. Los errores de entrega se registran.
+8. No se declara entrega sin confirmación.
+9. El nivel de atención aparece correctamente.
+10. Los casos prioritarios siguen el procedimiento institucional y no dependen solamente de una notificación push.
+
+No afirmes que las pruebas pasaron si únicamente compilaste el proyecto.
+
+---
+
+# PARTE 11. IMPLEMENTACIÓN POR ETAPAS
+
+## 32. Orden de trabajo
+
+### CHECKPOINT 1 — Diagnóstico
+
+Inspecciona:
+
+- Estructura actual de SIGAE.
+- Roles.
+- Autenticación.
+- Asignaciones docentes.
+- Matrículas.
+- Vínculos familiares.
+- Sistema de notificaciones existente.
+- Reglas de Firestore.
+- Backend disponible.
+
+### CHECKPOINT 2 — Datos del Kárdex
+
+Implementa o adapta las colecciones y relaciones.
+
+No dupliques registros.
+
+### CHECKPOINT 3 — Formulario docente
+
+Implementa:
+
+- Selección de curso.
+- Selección de estudiante.
+- Tipo de observación.
+- Nivel.
+- Descripción.
+- Guardar borrador.
+- Enviar o solicitar revisión.
+
+### CHECKPOINT 4 — Bandeja y notificaciones internas
+
+Conecta observaciones autorizadas con las bandejas de los destinatarios.
+
+### CHECKPOINT 5 — Panel familiar
+
+Implementa «Comportamiento de mi hijo», filtros, historial y detalles.
+
+### CHECKPOINT 6 — Revisión de Dirección
+
+Implementa validación, seguimiento y citaciones.
+
+### CHECKPOINT 7 — Respuestas y aclaraciones
+
+Conecta el Kárdex con la mensajería interna autorizada.
+
+### CHECKPOINT 8 — Seguridad y pruebas
+
+Comprueba Firestore, permisos y persistencia.
+
+### CHECKPOINT 9 — Notificaciones push
+
+Implementa Firebase Cloud Messaging solamente después de comprobar la infraestructura, los permisos y la autorización de despliegue.
+
+No avances a módulos externos sin que funcionen las notificaciones internas.
+
+---
+
+# PARTE 12. REQUISITO DE ENTREGA
+
+Después de cada checkpoint debes indicar:
+
+1. Qué archivos modificaste.
+2. Qué errores encontraste.
+3. Qué funciones implementaste.
+4. Qué colecciones de Firebase utilizaste.
+5. Cómo se verifica la autorización.
+6. Qué botones funcionan.
+7. Qué escrituras comprobaste.
+8. Qué pruebas ejecutaste realmente.
+9. Qué falló.
+10. Qué queda pendiente.
+
+No declares que el Kárdex está terminado si solamente aparece su pantalla.
+
+No generes observaciones reales sobre estudiantes sin que un docente autorizado las registre.
+
+No envíes notificaciones reales a padres durante pruebas sin autorización.
+
+No alteres datos reales ni despliegues reglas automáticamente.
+
+**COMIENZA POR EL CHECKPOINT 1: inspecciona la aplicación actual, identifica el sistema de notificaciones existente y diseña la integración segura del Kárdex sin romper las funciones del profesor, del padre ni de Dirección. Después implementa y verifica los siguientes checkpoints en orden.**

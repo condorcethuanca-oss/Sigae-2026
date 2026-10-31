@@ -1,0 +1,1165 @@
+# SIGAE — CORRECCIÓN INTEGRAL DEL KÁRDEX ESCOLAR, USUARIOS REALES, NOTIFICACIONES A PADRES, CUENTA DE DIRECCIÓN Y FIREBASE
+
+## INSTRUCCIÓN PRINCIPAL
+
+Actúa como arquitecto de software sénior, ingeniero experto en React, TypeScript, Firebase Authentication, Cloud Firestore, Firebase Admin SDK, seguridad escolar y sistemas de gestión académica.
+
+Analiza el problema como un director de colegio, un profesor que debe registrar observaciones y un padre que necesita recibir información confiable sobre su hijo.
+
+Trabaja sobre SIGAE — Sistema Integral de Gestión Académica Escolar, para la U.E. Luis Espinal Tarde de Collpani.
+
+Código SIE: 80730142.
+
+Gestión académica: 2026.
+
+**ESTE TRABAJO ES UNA CORRECCIÓN FUNCIONAL Y DE SEGURIDAD, NO UNA RECONSTRUCCIÓN DE LA APLICACIÓN.**
+
+El Kárdex actualmente presenta estudiantes ficticios, no muestra correctamente a los padres registrados y no entrega las notificaciones como debería.
+
+Quiero que encuentres las causas reales y las corrijas en el código, los servicios, las relaciones de datos y las reglas de Firebase.
+
+No acepto una solución que solamente cambie nombres en pantalla.
+
+Los datos deben provenir de Firebase y deben persistir correctamente.
+
+---
+
+# PARTE 1. DIAGNÓSTICO DEL PROBLEMA ACTUAL
+
+## 1. AUDITA LOS ARCHIVOS EXISTENTES
+
+Inspecciona directamente:
+
+- `src/components/panels/TeacherKardexView.tsx`
+- `src/components/panels/DirectorKardexView.tsx`
+- `src/components/panels/FamilyKardexView.tsx`
+- `src/firebase/kardexService.ts`
+- `src/firebase/studentService.ts`
+- `src/firebase/directorService.ts`
+- `src/firebase/authService.ts`
+- `src/firebase/messagingService.ts`
+- `src/firebase/notificationService.ts`
+- `src/firebase/config.ts`
+- `src/App.tsx`
+- `src/types.ts`
+- `firestore.rules`
+- Archivos backend y middleware utilizados para operaciones privilegiadas.
+
+Las rutas anteriores proceden del informe de auditoría. Si han cambiado, localiza sus equivalentes reales.
+
+Determina:
+
+1. De dónde obtiene el Kárdex su lista de estudiantes.
+2. Si utiliza arrays simulados o datos de ejemplo.
+3. Qué colección representa el padrón oficial.
+4. Cómo identifica el curso y paralelo de cada estudiante.
+5. Cómo verifica las asignaciones docentes.
+6. Cómo localiza al padre del estudiante.
+7. Cómo valida un vínculo familiar aprobado.
+8. Cómo crea una observación.
+9. Cómo crea una notificación.
+10. Cómo determina si realmente fue guardada.
+11. Qué consulta ejecuta la bandeja familiar.
+12. Qué reglas bloquean o permiten estas operaciones.
+
+Primero presenta los problemas encontrados, distinguiendo hechos comprobados de hipótesis.
+
+---
+
+# PARTE 2. EL KÁRDEX SOLO SERÁ ADMINISTRADO POR PROFESORES Y DIRECCIÓN
+
+## 2. ROLES AUTORIZADOS
+
+Los roles oficiales de SIGAE son:
+
+- `director`
+- `profesor`
+- `padre`
+- `alumno`
+
+El Kárdex administrativo debe estar disponible exclusivamente para:
+
+**PROFESOR:** registrar y consultar las observaciones de estudiantes de sus materias y cursos oficialmente asignados.
+
+**DIRECTOR:** supervisar los registros institucionales, revisar observaciones, gestionar seguimientos y resolver situaciones que requieran intervención de Dirección.
+
+El padre NO tendrá acceso al Kárdex administrativo.
+
+El estudiante NO podrá crear, modificar ni administrar registros de Kárdex.
+
+### Diferencia importante
+
+Los padres pueden recibir comunicaciones privadas derivadas del Kárdex de sus hijos.
+
+Eso no significa que tengan acceso al módulo utilizado por el profesor para administrar observaciones.
+
+Los padres tendrán un apartado de seguimiento familiar o notificaciones, donde podrán consultar únicamente información autorizada sobre sus propios hijos.
+
+No publiques observaciones privadas en listas generales o calendarios públicos.
+
+---
+
+# PARTE 3. LOS ESTUDIANTES DEBEN SER REALES
+
+## 3. ELIMINAR LOS ESTUDIANTES INVENTADOS
+
+Actualmente el Kárdex muestra estudiantes que no corresponden a los registros verdaderos de SIGAE.
+
+Busca:
+
+- Arrays de alumnos codificados manualmente.
+- Datos mock.
+- Listas de ejemplo.
+- Seeds automáticos.
+- Datos cargados como fallback.
+- Estudiantes generados al abrir una pantalla.
+- Estudiantes fabricados cuando Firestore no responde.
+
+Elimina su utilización en producción.
+
+No borres datos legítimos sin revisar su procedencia.
+
+### Regla fundamental
+
+El Kárdex debe consultar la matrícula y el padrón reales de Firestore.
+
+No debe inventar estudiantes cuando la consulta devuelva cero resultados.
+
+### Si un curso está vacío
+
+Muestra:
+
+«Este curso todavía no tiene estudiantes matriculados».
+
+### Si Firebase falla
+
+Muestra:
+
+«No se pudo consultar la lista de estudiantes. Revisa tu conexión».
+
+No sustituyas errores de Firebase por listas ficticias.
+
+## 4. FUENTE CANÓNICA DE ESTUDIANTES
+
+Inspecciona las colecciones reales del proyecto.
+
+El informe anterior indicaba:
+
+`/students`: 0 documentos.
+
+No asumas que una cuenta con rol `alumno` representa automáticamente una matrícula oficial.
+
+Debes distinguir:
+
+**Usuario de Authentication:** persona que tiene credenciales para iniciar sesión.
+
+**Perfil en `/users`:** datos y rol de la cuenta.
+
+**Estudiante en el padrón:** identidad académica oficial.
+
+**Matrícula:** relación con una gestión, grado, paralelo y curso.
+
+Una cuenta de estudiante puede existir sin que su matrícula haya sido completada.
+
+Un estudiante matriculado también puede existir sin tener cuenta propia para iniciar sesión.
+
+Por ello, crea o reutiliza un modelo de relación adecuado, utilizando las colecciones institucionales existentes.
+
+No generes matrículas a partir de suposiciones.
+
+### Consulta correcta para el profesor
+
+Cuando el profesor abre el Kárdex:
+
+1. Obtener su UID autenticado.
+2. Verificar que esté aprobado y activo.
+3. Consultar sus asignaciones académicas vigentes.
+4. Mostrar únicamente sus cursos autorizados.
+5. Permitir seleccionar el curso y la materia.
+6. Consultar las matrículas activas de ese curso.
+7. Recuperar los expedientes oficiales correspondientes.
+8. Mostrar nombres reales de los estudiantes.
+9. Permitir seleccionar un estudiante de esa lista.
+
+Si el profesor no tiene cursos asignados, mostrar:
+
+«Todavía no tienes cursos asignados».
+
+No listar todos los alumnos del colegio.
+
+---
+
+# PARTE 4. CÓMO DEBE VERSE EL KÁRDEX DEL PROFESOR
+
+## 5. PANTALLA PRINCIPAL
+
+Quiero una pantalla sencilla, moderna y coherente con SIGAE.
+
+Título:
+
+**Kárdex de estudiantes**
+
+Debajo:
+
+**Curso:** selector de cursos asignados.
+
+**Materia:** selector de materias asignadas al profesor para ese curso.
+
+**Gestión:** 2026.
+
+Después mostrar una tabla o lista de alumnos.
+
+### Columnas principales
+
+- N.º
+- Nombre completo del estudiante.
+- Curso y paralelo.
+- Observaciones registradas.
+- Última observación.
+- Acción «Ver historial».
+- Acción «Nueva observación».
+
+En teléfonos utiliza tarjetas o filas adaptables.
+
+No muestres en la tabla general el CI o RUDE completo, porque no es necesario para registrar una observación.
+
+### Al seleccionar un estudiante
+
+Abrir una ficha con:
+
+- Nombre real.
+- Curso.
+- Materia.
+- Profesor responsable.
+- Historial de observaciones autorizadas.
+- Estado de seguimientos.
+- Botón «Registrar observación».
+
+No mostrar fotografías inventadas.
+
+Si no existe foto oficial, usar un avatar neutro con iniciales.
+
+---
+
+# PARTE 5. REGISTRO DE OBSERVACIONES
+
+## 6. FORMULARIO DE NUEVA OBSERVACIÓN
+
+Cuando el profesor pulse «Registrar observación», debe aparecer:
+
+**Nueva observación de Kárdex**
+
+Información no editable:
+
+- Estudiante seleccionado.
+- Curso.
+- Materia.
+- Profesor autenticado.
+- Gestión académica.
+
+Campos editables:
+
+**Categoría**
+
+- Tarea no presentada.
+- Observación de comportamiento.
+- Incumplimiento de acuerdo.
+- Reconocimiento positivo.
+- Seguimiento escolar.
+- Solicitud de reunión.
+- Otro motivo autorizado.
+
+**Nivel de atención**
+
+1. Informativo.
+2. Llamada de atención.
+3. Atención familiar.
+4. Prioritario.
+
+**Descripción**
+
+Campo de texto para explicar objetivamente lo ocurrido.
+
+**Fecha del hecho**
+
+Fecha real de la situación.
+
+**Acción sugerida**
+
+Opcional, por ejemplo conversar con la familia o solicitar seguimiento.
+
+**Comunicar a la familia**
+
+Casilla opcional o comportamiento definido por la política institucional.
+
+### Reglas
+
+No conviertas automáticamente una tarea no presentada en una falta grave.
+
+No calcules niveles disciplinarios a partir de notas.
+
+No generes sanciones automáticas.
+
+No utilices diagnósticos personales o etiquetas negativas sobre el estudiante.
+
+Permite registrar también observaciones positivas.
+
+La descripción debe ser objetiva, respetuosa y relacionada con hechos escolares.
+
+### Botones
+
+- Cancelar.
+- Guardar observación.
+- Guardar y revisar notificación.
+
+No envíes automáticamente un mensaje privado mientras el profesor todavía está redactando.
+
+---
+
+# PARTE 6. CÓMO SE ENVÍA LA NOTIFICACIÓN AL PADRE
+
+## 7. FLUJO COMPLETO
+
+Cuando un profesor registra una observación y desea comunicarla:
+
+1. Selecciona un estudiante real.
+2. Escribe la observación.
+3. El sistema verifica sus permisos docentes.
+4. El sistema identifica al estudiante institucional.
+5. Consulta sus vínculos familiares aprobados.
+6. Localiza las cuentas reales de los tutores autorizados.
+7. Verifica que los destinatarios estén habilitados para recibir comunicaciones.
+8. Muestra una vista previa del aviso.
+9. El profesor confirma.
+10. El backend guarda la observación y procesa la notificación de forma segura.
+11. La bandeja del padre muestra el nuevo aviso.
+12. Se registra cuándo fue leído y si existe respuesta.
+
+No envíes observaciones del Kárdex a cualquier adulto que conozca el RUDE del estudiante.
+
+## 8. LOCALIZACIÓN CORRECTA DEL PADRE
+
+Utiliza la colección canónica de vínculos familiares aprobados.
+
+Según la auditoría, la ruta actual es:
+
+`/parentStudentLinks`
+
+Comprueba si el proyecto usa también variantes como:
+
+`/parent_student_links`
+
+`/parentStudentLinkRequests`
+
+No dupliques vínculos ni consultes una ruta diferente a la que realmente utiliza SIGAE.
+
+### Vinculación familiar válida
+
+Una vinculación debe contener como mínimo:
+
+- Identificador del vínculo.
+- UID del padre.
+- Identificador institucional del estudiante.
+- Estado aprobado.
+- Institución.
+- Fecha de aprobación.
+- Responsable de la aprobación.
+
+Verifica la correspondencia con las matrículas oficiales.
+
+Un padre no debe aprobarse a sí mismo.
+
+La creación de un vínculo aprobado debe realizarla Dirección o un proceso seguro de autorización familiar mediante un backend confiable.
+
+El simple conocimiento del CI o RUDE nunca autoriza el acceso.
+
+### Si existen dos tutores autorizados
+
+El sistema podrá notificar a ambos, según el alcance autorizado.
+
+Cada tutor tendrá un registro independiente de lectura.
+
+No crees duplicados para una misma cuenta.
+
+### Si no hay padres vinculados
+
+No inventes nombres ni destinatarios.
+
+Muestra al profesor:
+
+«Este estudiante todavía no tiene un padre o tutor vinculado y aprobado en SIGAE».
+
+Ofrece una opción para comunicar la situación a Dirección mediante los canales institucionales.
+
+La observación podrá guardarse sin enviar una notificación.
+
+El sistema NO debe mostrar «Notificación enviada» si no existe ningún destinatario autorizado.
+
+---
+
+# PARTE 7. CONFIRMACIÓN ANTES DEL ENVÍO
+
+## 9. VISTA PREVIA OBLIGATORIA
+
+Antes de enviar:
+
+**¿Estás seguro de comunicar esta observación?**
+
+Mostrar:
+
+- Estudiante.
+- Curso.
+- Materia.
+- Profesor responsable.
+- Categoría.
+- Nivel de atención.
+- Resumen de la observación.
+- Destinatarios familiares autorizados.
+- Cantidad real de destinatarios.
+
+Botones:
+
+**Volver y editar**
+
+**Confirmar y notificar**
+
+Si no hay destinatarios aprobados, deshabilita «Confirmar y notificar» y permite solamente guardar la observación.
+
+No utilices listas simuladas en la confirmación.
+
+---
+
+# PARTE 8. LO QUE DEBE VER EL PADRE
+
+## 10. PANEL FAMILIAR
+
+El padre no tendrá acceso a las herramientas administrativas del Kárdex.
+
+Podrá recibir:
+
+**Notificaciones sobre mis hijos**
+
+Si tiene varios hijos, podrá seleccionar uno.
+
+Una notificación de Kárdex debe incluir:
+
+- Nombre del hijo.
+- Materia.
+- Profesor responsable.
+- Fecha del hecho.
+- Categoría.
+- Nivel de atención, cuando sea apropiado comunicarlo.
+- Descripción autorizada.
+- Fecha de envío.
+- Estado de lectura.
+
+### Ejemplo
+
+**Observación de Matemáticas**
+
+Estudiante: hijo vinculado.
+
+Motivo: tarea no presentada.
+
+Mensaje:
+
+«Se informa que el estudiante no presentó la actividad correspondiente a la clase de Matemáticas. Puede comunicarse con el profesor para solicitar información».
+
+Acciones:
+
+- Marcar como leído.
+- Responder.
+- Solicitar aclaración.
+
+Las respuestas no deben alterar la descripción original del profesor.
+
+Conserva un historial de respuestas y seguimientos.
+
+Si el padre no tiene hijos vinculados, muestra el estado correspondiente y la opción de solicitar una vinculación.
+
+No muestres observaciones de estudiantes ajenos.
+
+---
+
+# PARTE 9. FIREBASE — MODELO DE DATOS
+
+## 11. CONSERVAR COLECCIONES EXISTENTES
+
+Antes de crear nuevas colecciones, inspecciona la base actual.
+
+El proyecto informado es:
+
+`xenodochial-cosine-2ds98`
+
+Base de datos Firestore con ID:
+
+`ai-studio-educolegioprivad-8d51e715-5615-43ee-b044-0495c4753a9d`
+
+Verifica los identificadores con `src/firebase/config.ts`.
+
+No conectes accidentalmente los servicios a la base `(default)` si SIGAE utiliza una base con nombre propio.
+
+Las colecciones mencionadas en los informes incluyen:
+
+- `/users`
+- `/teachers`
+- `/students`
+- `/parentStudentLinks`
+- `/parentStudentLinkRequests`
+- `/kardex_records`
+- `/notifications`
+- `/messages`
+- `/schedules`
+- `/attendance_sessions`
+- `/grades`
+
+Confirma su estructura efectiva antes de utilizarlas.
+
+## 12. DOCUMENTO DEL ESTUDIANTE
+
+Usa el expediente oficial existente.
+
+Debe relacionar:
+
+- Identificador institucional del estudiante.
+- Nombre completo.
+- Curso y paralelo mediante matrícula vigente.
+- Gestión.
+- Estado de matrícula.
+
+Los campos privados de identificación deben protegerse.
+
+No dupliques expedientes al registrar observaciones.
+
+## 13. DOCUMENTO DEL KÁRDEX
+
+Utiliza:
+
+`/kardex_records/{recordId}`
+
+Adapta los campos a los servicios existentes.
+
+Campos conceptuales:
+
+- `schoolId`
+- `academicYear`
+- `studentId`
+- `enrollmentId`
+- `courseId`
+- `subjectId`
+- `teacherUid`
+- `category`
+- `attentionLevel`
+- `description`
+- `incidentDate`
+- `communicationStatus`
+- `createdAt`
+- `updatedAt`
+- `createdBy`
+- `status`
+
+Los identificadores deben ser estables.
+
+El `teacherUid` no debe aceptarse como identidad confiable cuando el cliente lo envía libremente.
+
+Debe derivarse del usuario autenticado y validarse en backend.
+
+La observación debe permanecer vinculada al estudiante real, incluso si el estudiante pasa de curso en la gestión siguiente.
+
+No utilices el nombre del estudiante como clave principal.
+
+## 14. VINCULACIÓN FAMILIAR
+
+Utiliza:
+
+`/parentStudentLinks/{linkId}`
+
+Una vinculación aprobada debe indicar:
+
+- `parentUid`
+- `studentId`
+- `schoolId`
+- `status`
+- `approvedAt`
+- `approvedBy`
+
+El campo `studentId` debe corresponder a la identidad institucional utilizada por el Kárdex.
+
+No confundas `studentId` con el UID de Authentication si el modelo existente los diferencia.
+
+## 15. NOTIFICACIONES
+
+Utiliza:
+
+`/notifications/{notificationId}`
+
+Campos conceptuales:
+
+- `recipientUid`
+- `senderUid`
+- `studentId`
+- `kardexRecordId`
+- `type`
+- `title`
+- `safePreview`
+- `priority`
+- `createdAt`
+- `readAt`
+- `deliveryStatus`
+- `destination`
+
+El destinatario debe provenir de la vinculación familiar aprobada.
+
+No aceptes que un estudiante o padre cree avisos en nombre de Dirección o de un profesor.
+
+### Evitar duplicados
+
+Para cada observación y tutor autorizado, utiliza una clave idempotente o un identificador determinista de entrega.
+
+Ejemplo conceptual:
+
+`kardexRecordId + recipientUid + communicationVersion`
+
+No generes una nueva notificación repetida por cada actualización de pantalla.
+
+No dupliques la notificación cuando el backend reintente la operación.
+
+---
+
+# PARTE 10. ENTREGA REAL DE LA NOTIFICACIÓN
+
+## 16. PROCESAMIENTO SEGURO
+
+La creación de notificaciones privadas de Kárdex debe gestionarse mediante un backend confiable o mediante una operación cuya autorización esté rigurosamente validada.
+
+Flujo recomendado:
+
+1. El profesor autenticado solicita registrar una observación.
+2. El backend verifica su Firebase ID token.
+3. Consulta su perfil institucional.
+4. Verifica que está activo y aprobado.
+5. Verifica que tiene asignados el curso y la materia.
+6. Comprueba que el estudiante está matriculado allí.
+7. Guarda la observación de forma consistente.
+8. Resuelve los tutores con vínculos familiares aprobados.
+9. Comprueba el estado de cada cuenta destinataria.
+10. Genera una notificación interna por tutor autorizado.
+11. Registra el resultado de la operación.
+12. Devuelve a React el estado real.
+
+Para evitar fallos parciales, utiliza una operación recuperable e idempotente.
+
+Si la observación se guarda pero no se logra crear la notificación, conserva el registro y muestra:
+
+«Observación guardada. Notificación pendiente de entrega».
+
+No muestres «Enviado correctamente» cuando el proceso haya fallado.
+
+### Notificación dentro de SIGAE
+
+La primera entrega obligatoria será una notificación interna persistente en Firestore.
+
+No dependas inicialmente de WhatsApp o SMS.
+
+Firebase Cloud Messaging puede incorporarse después si existe infraestructura configurada y autorizada.
+
+No actives servicios de pago sin autorización.
+
+### Cuando el padre entra
+
+El frontend consulta solamente sus notificaciones:
+
+`recipientUid == auth.currentUser.uid`
+
+La campana mostrará:
+
+- Contador real de no leídas.
+- Título.
+- Remitente.
+- Fecha.
+- Tipo.
+- Enlace a la observación autorizada.
+
+Los estados de lectura se guardan individualmente.
+
+No mezcles «guardada», «enviada internamente», «entregada por push» y «leída».
+
+---
+
+# PARTE 11. REGLAS DE FIRESTORE — CORRECCIONES OBLIGATORIAS
+
+## 17. AUDITORÍA DE REGLAS
+
+He proporcionado un archivo de reglas anterior que contiene permisos demasiado amplios.
+
+Debes revisar específicamente:
+
+### A. `/kardex_records`
+
+No permitas:
+
+`getUserRole() == 'padre'`
+
+como autorización suficiente para leer cualquier observación.
+
+Tampoco permitas:
+
+`getUserRole() == 'alumno'`
+
+como autorización general.
+
+Las lecturas deben depender de la identidad, la asignación docente y las vinculaciones familiares correspondientes.
+
+El padre debe consultar solamente una representación o documento de comunicación autorizado sobre su propio hijo, no todo el registro administrativo del Kárdex.
+
+### B. `/students`
+
+Revisa la regla actual:
+
+`allow read: if isSignedIn();`
+
+No quiero que cualquier usuario autenticado pueda consultar todos los datos personales del padrón.
+
+Protege los expedientes completos y crea vistas o consultas limitadas según rol y relación institucional.
+
+### C. `/parentStudentLinks`
+
+No permitas que un padre cree directamente una vinculación aprobada simplemente escribiendo su UID.
+
+La aprobación debe ser institucional o realizarse mediante un canje seguro validado en backend.
+
+No permitas editar arbitrariamente estado, estudiante, fecha de aprobación o aprobador.
+
+### D. `/familyLinkInvitations`
+
+No permitas que cualquier usuario autenticado consulte códigos secretos de otras familias.
+
+No aceptes como válido un canje solamente porque el cliente marque `isConsumed = true`.
+
+Verifica códigos, vencimientos, destinatarios, límites de intentos y consumo único mediante un proceso seguro.
+
+### E. `/notifications`
+
+El informe previo contenía una regla general:
+
+`allow create: if isSignedIn();`
+
+Eso no es suficiente para avisos oficiales.
+
+Impide la creación arbitraria de notificaciones que suplanten a docentes o Dirección.
+
+La lectura debe corresponder al destinatario autorizado.
+
+La actualización de lectura debe permitir modificar solamente los campos necesarios, sin alterar remitente, estudiante, mensaje ni destinatario.
+
+### F. `/attendance_sessions`
+
+No permitas que cualquier profesor activo modifique la asistencia de cualquier curso.
+
+Verifica la asignación real y la clase correspondiente.
+
+### G. `/calendar_events`
+
+No permitas leer cualquier evento privado simplemente por estar autenticado.
+
+Comprueba visibilidad institucional, curso o destinatario.
+
+### H. `/messages`
+
+Revisa si existen destinatarios grupales cuya lectura sea demasiado amplia.
+
+El permiso debe distinguir comunicaciones públicas institucionales y mensajes privados.
+
+### I. Reglas superpuestas
+
+Revisa las múltiples cláusulas `match` porque las autorizaciones pueden acumularse.
+
+No asumas que una regla más restrictiva cancela automáticamente otra que concede acceso.
+
+### Requisito técnico
+
+Firestore Security Rules no funcionan como filtros automáticos.
+
+Las consultas del cliente deben ser compatibles con las restricciones de lectura.
+
+No ejecutes una consulta general de todo el Kárdex esperando que Firestore devuelva únicamente los documentos permitidos.
+
+Diseña consultas limitadas por curso, estudiante, destinatario y autorizaciones verificadas.
+
+### Entrega
+
+Prepara las reglas completas adaptadas a la estructura real.
+
+Ejecuta pruebas de acceso permitido y denegado.
+
+No publiques reglas nuevas en producción sin aprobación.
+
+---
+
+# PARTE 12. CORRECCIÓN DE LA CUENTA DE DIRECCIÓN
+
+## 18. CUENTA ADMINISTRADORA SOLICITADA
+
+Necesito que compruebes y habilites correctamente esta identidad institucional.
+
+Correo:
+
+`gamacondorilopez74@gmail.com`
+
+UID:
+
+`0zHkg7u1XsaJ15EiXtVNzY8qTWt2`
+
+El informe técnico anterior indicó que se creó este perfil:
+
+`/users/0zHkg7u1XsaJ15EiXtVNzY8qTWt2`
+
+Con rol:
+
+`director`
+
+Sin embargo, el usuario informa que todavía no aparece correctamente en el sistema administrativo.
+
+Por tanto, verifica:
+
+1. Que el UID exista en Firebase Authentication.
+2. Que corresponda al correo indicado.
+3. Que el perfil exista en la base Firestore realmente utilizada.
+4. Que el perfil esté activo.
+5. Que el rol sea `director`.
+6. Que no haya restricciones adicionales erróneas.
+7. Que el enrutador reconozca el perfil.
+8. Que las reglas permitan las operaciones autorizadas.
+9. Que el backend reconozca el permiso.
+10. Que el panel consulte cuentas reales.
+
+No basta con agregar el UID a un array en `src/types.ts`.
+
+No confíes exclusivamente en el frontend para determinar los permisos.
+
+Si hace falta una custom claim, configúrala mediante Firebase Admin SDK después de verificar la identidad.
+
+No publiques credenciales privadas en el código.
+
+No cambies ni restablezcas contraseñas silenciosamente.
+
+## 19. ELIMINAR EL ROL `superadmin`
+
+SIGAE solo utilizará cuatro roles institucionales:
+
+- `director`
+- `profesor`
+- `padre`
+- `alumno`
+
+No debe existir un quinto rol de aplicación llamado `superadmin`.
+
+Quiero eliminar de manera controlada:
+
+- Pantallas de SuperAdmin.
+- Opciones de registro como SuperAdmin.
+- Rutas de SuperAdmin.
+- Comprobaciones de `role == 'superadmin'`.
+- Permisos especiales hardcodeados para ese rol.
+- Constantes de SuperAdmin.
+- Reglas que concedan privilegios por pertenecer a un UID reservado de SuperAdmin.
+- Menús administrativos duplicados.
+
+Revisa también el UID antiguo reservado:
+
+`385JXeNTGcNrZvV2casb8ICaQvE2`
+
+No lo elimines como identidad de Authentication ni modifiques sus datos sin analizar primero su situación.
+
+Lo que deseo eliminar es el rol y las capacidades automáticas de `superadmin` en SIGAE, no borrar indiscriminadamente una cuenta real.
+
+### Migración segura
+
+Antes de retirar permisos:
+
+1. Identifica las cuentas y rutas afectadas.
+2. Comprueba qué operaciones dependen de ese rol.
+3. Prepara una migración.
+4. Conserva una forma de administración institucional verificada.
+5. Realiza pruebas con la cuenta solicitada.
+6. Solicita autorización antes de modificar permisos de producción.
+
+No sustituyas el rol `superadmin` por un nuevo nombre equivalente para mantener una puerta de acceso privilegiada.
+
+Las operaciones institucionales deben pasar por el modelo `director` con permisos granulares y verificación segura.
+
+## 20. DIRECTORES ANTERIORES
+
+Los informes mencionan los UID:
+
+`At1j9MIIu1ZN0ZRZDas28ILQn2y1`
+
+`oVuD2FxNPqZbzBUfCzKPXc9t1V82`
+
+Investiga a qué identidades corresponden.
+
+No desactives automáticamente cuentas legítimas.
+
+No concedas privilegios por simples coincidencias de correo almacenadas en el frontend.
+
+Prepara un inventario de cuentas de Dirección y sus permisos reales.
+
+---
+
+# PARTE 13. INTERFAZ DEL DIRECTOR PARA SUPERVISAR EL KÁRDEX
+
+## 21. PANEL ADMINISTRATIVO
+
+La sección se llamará:
+
+**Kárdex y seguimiento escolar**
+
+Debe permitir:
+
+- Seleccionar curso.
+- Seleccionar estudiante real.
+- Consultar observaciones.
+- Filtrar por fecha.
+- Filtrar por materia.
+- Filtrar por nivel de atención.
+- Revisar responsables.
+- Consultar comunicaciones realizadas.
+- Ver estados de notificación.
+- Gestionar seguimientos.
+- Registrar resoluciones institucionales autorizadas.
+
+No inventes estudiantes para rellenar la vista.
+
+Si el padrón todavía está vacío, muestra el estado correspondiente.
+
+### Intervención de Dirección
+
+Para niveles que requieran seguimiento, Dirección podrá:
+
+- Abrir el expediente.
+- Registrar una revisión.
+- Añadir una resolución o acuerdo.
+- Solicitar una reunión.
+- Registrar si la situación está pendiente o resuelta.
+
+Conserva trazabilidad.
+
+No modifiques silenciosamente la observación original del profesor.
+
+---
+
+# PARTE 14. INTEGRACIÓN CON CALENDARIO Y MENSAJERÍA
+
+## 22. SEPARACIÓN DE MÓDULOS
+
+Mantén diferencias claras:
+
+**Kárdex:** hechos y seguimientos individuales.
+
+**Mensajería:** conversaciones y comunicaciones dirigidas.
+
+**Notificaciones:** avisos internos y estados de lectura.
+
+**Calendario:** fechas de actividades y reuniones.
+
+Si una observación deriva en una reunión familiar, el sistema puede crear un evento privado autorizado para esa familia y el profesor correspondiente.
+
+Pero una observación de conducta no debe publicarse como un evento visible para todo el curso.
+
+No dupliques mensajes, citas y observaciones.
+
+Relaciona los documentos mediante identificadores.
+
+---
+
+# PARTE 15. PRUEBAS OBLIGATORIAS
+
+## 23. PRUEBAS DEL KÁRDEX
+
+Realiza pruebas reales en un entorno aislado.
+
+### Lista de estudiantes
+
+- El profesor ve únicamente cursos asignados.
+- El profesor ve estudiantes matriculados realmente.
+- Un curso sin matrícula no muestra estudiantes ficticios.
+- Firestore desconectado no genera datos alternativos inventados.
+
+### Registro
+
+- Se puede crear una observación con datos válidos.
+- Se guarda en el estudiante correcto.
+- Se conserva la materia.
+- Se conserva el profesor responsable.
+- El registro persiste al recargar.
+
+### Vinculación familiar
+
+- Un padre con vínculo aprobado puede recibir información autorizada de su hijo.
+- Otro padre no puede ver la observación.
+- Una solicitud pendiente no permite acceder.
+- Un CI o RUDE conocido no da acceso.
+- No se permite autoaprobar vínculos.
+
+### Notificación
+
+- Se confirma antes de enviarse.
+- Se identifica al destinatario real.
+- Llega a la bandeja del tutor.
+- El contador se actualiza.
+- Abrirla muestra el detalle autorizado.
+- Marcarla como leída afecta solamente al destinatario.
+- Una falla de entrega se comunica correctamente.
+- Los reintentos no producen duplicados.
+- Sin padres vinculados no se declara entrega exitosa.
+
+### Seguridad
+
+- Alumno no puede crear observaciones.
+- Padre no puede administrar Kárdex.
+- Profesor no puede registrar observaciones en cursos ajenos.
+- Profesor no puede falsificar otro remitente.
+- Padres no pueden consultar expedientes ajenos.
+- Los permisos se validan también en backend y Firestore.
+
+### Dirección
+
+- Cuenta administrativa verificada entra al panel autorizado.
+- El rol `superadmin` no aparece como opción pública.
+- Las funciones de Dirección no dependen de perfiles provisionales offline.
+- El sistema conserva el acceso de las cuentas legítimas durante una migración controlada.
+
+---
+
+# PARTE 16. ORDEN DE IMPLEMENTACIÓN
+
+## CHECKPOINT 1 — ENCONTRAR EL ORIGEN DE LOS USUARIOS FICTICIOS
+
+Identifica exactamente dónde se generan o cargan.
+
+Elimina los fallbacks ficticios de producción.
+
+No borres registros legítimos.
+
+## CHECKPOINT 2 — RECUPERAR LOS ESTUDIANTES REALES
+
+Audita `/students`, matrículas, cursos, `/users` y asignaciones.
+
+Conecta la lista del profesor a la matrícula oficial.
+
+Si no hay estudiantes, conserva la lista vacía.
+
+## CHECKPOINT 3 — CORREGIR VINCULACIONES FAMILIARES
+
+Verifica `/parentStudentLinks`.
+
+Corrige las consultas y permisos.
+
+Impide vínculos aprobados creados arbitrariamente.
+
+## CHECKPOINT 4 — CORREGIR EL FORMULARIO DEL KÁRDEX
+
+Comprueba la selección de estudiante, materia, categoría, descripción y fecha.
+
+Conecta el guardado real a Firestore.
+
+## CHECKPOINT 5 — CORREGIR EL ENVÍO DE NOTIFICACIONES
+
+Implementa entrega interna segura.
+
+Relaciona la observación con el tutor aprobado.
+
+Comprueba que el padre puede recibir y leer la notificación.
+
+## CHECKPOINT 6 — CORREGIR LAS REGLAS
+
+Audita y prepara reglas de Firestore para Kárdex, estudiantes, familiares y notificaciones.
+
+Ejecuta pruebas de permisos.
+
+No despliegues sin autorización.
+
+## CHECKPOINT 7 — CONFIGURAR DIRECCIÓN
+
+Comprueba la cuenta:
+
+`gamacondorilopez74@gmail.com`
+
+UID:
+
+`0zHkg7u1XsaJ15EiXtVNzY8qTWt2`
+
+Corrige su relación con Authentication, Firestore, backend y enrutamiento.
+
+## CHECKPOINT 8 — ELIMINAR `superadmin`
+
+Prepara una migración segura hacia los cuatro roles oficiales.
+
+Elimina capacidades especiales obsoletas y rutas duplicadas.
+
+No borres cuentas legítimas.
+
+## CHECKPOINT 9 — INTEGRACIÓN GENERAL
+
+Comprueba Kárdex, matrículas, padres, notificaciones y calendario.
+
+## CHECKPOINT 10 — PRUEBAS FINALES
+
+Ejecuta pruebas de seguridad, persistencia, tipos, compilación y flujos completos.
+
+---
+
+# PARTE 17. INFORME QUE DEBES ENTREGAR
+
+Después de cada checkpoint informa:
+
+1. Qué archivos inspeccionaste.
+2. Dónde estaba exactamente el error.
+3. Qué colecciones consultaste.
+4. Qué documentos y relaciones verificaste.
+5. Qué funciones modificaste.
+6. Qué archivos cambiaste.
+7. Qué consultas realiza ahora el Kárdex.
+8. Cómo obtiene al padre real.
+9. Cómo entrega la notificación.
+10. Qué permisos aplicaste.
+11. Qué pruebas ejecutaste.
+12. Qué resultados observaste.
+13. Qué queda pendiente.
+14. Qué acciones requieren autorización para producción.
+
+Usa estos estados:
+
+**VERIFICADO:** comprobado realmente.
+
+**IMPLEMENTADO:** desarrollado, pero pendiente de alguna comprobación.
+
+**PENDIENTE:** no completado.
+
+**PROPUESTO:** diseño futuro.
+
+No declares «Notificación enviada correctamente» sin comprobar que el proceso de entrega interno se realizó.
+
+No declares «Kárdex funcional» si todavía utiliza estudiantes simulados.
+
+No declares «Cuenta de Dirección configurada» únicamente porque agregaste su UID en React.
+
+---
+
+# INSTRUCCIÓN FINAL
+
+La prioridad es que el profesor pueda abrir SIGAE, elegir uno de sus cursos, ver estudiantes verdaderos, registrar una observación y comunicarla al padre correcto.
+
+La Dirección debe poder supervisar este proceso.
+
+El padre debe recibir la notificación privada de su hijo, pero no poder administrar el Kárdex.
+
+Los estudiantes no deben crear observaciones ni consultar información disciplinaria ajena.
+
+La aplicación debe utilizar Firebase real y las relaciones institucionales correctas.
+
+No quiero usuarios inventados, destinatarios falsos ni confirmaciones de envío simuladas.
+
+También debes corregir el acceso administrativo de la cuenta indicada y eliminar el rol `superadmin` de SIGAE mediante una migración segura.
+
+**COMIENZA ANALIZANDO LA CAUSA REAL DEL KÁRDEX QUE MUESTRA ESTUDIANTES FICTICIOS. DESPUÉS CORRIGE LAS RELACIONES CON FIREBASE Y EL ENVÍO DE NOTIFICACIONES. NO RECONSTRUYAS LA APLICACIÓN NI MODIFIQUES DATOS DE PRODUCCIÓN SIN AUTORIZACIÓN.**

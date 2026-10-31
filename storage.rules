@@ -1,0 +1,160 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Identificación exclusiva y definitiva del Superadministrador por UID confiable
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.uid == '385JXeNTGcNrZvV2casb8ICaQvE2';
+    }
+
+    // Permisos del Director Institucional (incluye al Superadministrador)
+    function isDirector() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        request.auth.uid == 'At1j9MIIu1ZN0ZRZDas28ILQn2y1' ||
+        request.auth.uid == 'oVuD2FxNPqZbzBUfCzKPXc9t1V82' ||
+        request.auth.uid == '0zHkg7u1XsaJ15EiXtVNzY8qTWt2' ||
+        ('role' in request.auth.token && request.auth.token.role == 'director') ||
+        ('email' in request.auth.token && (
+          request.auth.token.email == 'condorcethuanca@gmail.com' ||
+          request.auth.token.email == 'director@sigae.edu.bo' ||
+          request.auth.token.email == 'director.institucional@sigae.edu.bo' ||
+          request.auth.token.email == 'gamacondorilopez74@gmail.com'
+        ))
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isTeacherOwner(teacherId) {
+      return isSignedIn() && (
+        request.auth.uid == teacherId ||
+        ('teacherId' in request.auth.token && request.auth.token.teacherId == teacherId)
+      );
+    }
+
+    function isValidImage(maxSizeMB) {
+      return request.resource.size <= maxSizeMB * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/(jpeg|png|webp|jpg)'));
+    }
+
+    function isValidDocument(maxSizeMB) {
+      return request.resource.size <= maxSizeMB * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/(jpeg|png|webp|jpg)') ||
+         request.resource.contentType == 'application/pdf');
+    }
+
+    // Default deny catch-all
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Profile photos: sigae/profiles/...
+    // Lectura: usuarios autenticados
+    // Escritura: usuarios autenticados (hasta 5MB, solo imágenes)
+    match /sigae/profiles/{fileName} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidImage(5);
+      allow delete: if isSuperAdmin();
+    }
+
+    // 2. Teacher signatures: sigae/teachers/{teacherId}/signatures/{fileName}
+    // Lectura y modificación: restringido al Director y al docente titular verificado
+    match /sigae/teachers/{teacherId}/signatures/{fileName} {
+      allow read: if isDirector() || isTeacherOwner(teacherId);
+      allow create, update: if (isDirector() || isTeacherOwner(teacherId)) && isValidImage(2);
+      allow delete: if isDirector() || isSuperAdmin();
+    }
+
+    // 3. Teacher documents (RDA, Títulos, Certificados): sigae/teachers/{teacherId}/{docType}/{fileName}
+    // Lectura y modificación: restringido al Director y al docente titular verificado
+    match /sigae/teachers/{teacherId}/{docType}/{fileName} {
+      allow read: if isDirector() || isTeacherOwner(teacherId);
+      allow create, update: if (isDirector() || isTeacherOwner(teacherId)) && isValidDocument(10);
+      allow delete: if isDirector() || isSuperAdmin();
+    }
+
+    // 4. Director institutional signatures: sigae/director/signatures/{fileName}
+    // Exclusivo de la Dirección Institucional y Superadministrador
+    match /sigae/director/signatures/{fileName} {
+      allow read: if isDirector();
+      allow create, update: if isDirector() && isValidImage(2);
+      allow delete: if isSuperAdmin();
+    }
+
+    // 5. Student documents & expedientes: sigae/students/{studentId}/{fileName}
+    // Lectura: Director, el propio alumno o el padre tutor verificado por childUid
+    match /sigae/students/{studentId}/{fileName} {
+      allow read: if isDirector() || isOwner(studentId) || (
+        isSignedIn() &&
+        request.auth.token.role == 'padre' &&
+        'childUid' in request.auth.token &&
+        request.auth.token.childUid == studentId
+      );
+      allow create, update: if (isDirector() || isOwner(studentId)) && isValidDocument(10);
+      allow delete: if isDirector() || isSuperAdmin();
+    }
+
+    // 6. Institutional circulars & attachments: sigae/circulars/{fileName}
+    match /sigae/circulars/{fileName} {
+      allow read: if isSignedIn();
+      allow create, update: if isDirector() && isValidDocument(10);
+      allow delete: if isDirector() || isSuperAdmin();
+    }
+
+    // 7. Institutional school logo & seal: sigae/institution/logo/{fileName}
+    match /sigae/institution/logo/{fileName} {
+      allow read: if true;
+      allow create, update: if isDirector() && isValidImage(5);
+      allow delete: if isSuperAdmin();
+    }
+
+    // 8. General uploads folder: sigae/general/{fileName}
+    match /sigae/general/{fileName} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidDocument(10);
+      allow delete: if isDirector() || isSuperAdmin();
+    }
+
+    // 9. User personal folder: /users/{userId}/{allPaths=**}
+    match /users/{userId}/{allPaths=**} {
+      allow read: if isSignedIn() && (isOwner(userId) || isDirector());
+      allow create, update: if isSignedIn() && isOwner(userId) && isValidDocument(5);
+      allow delete: if isSignedIn() && (isOwner(userId) || isDirector());
+    }
+
+    // 10. Teacher academic materials: /materials/{courseId}/{allPaths=**}
+    match /materials/{courseId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (isDirector() || ('role' in request.auth.token && request.auth.token.role == 'profesor')) && isValidDocument(25);
+      allow delete: if isDirector();
+    }
+
+    // 11. Communication attachments: /messages/{messageId}/{allPaths=**}
+    match /messages/{messageId}/{allPaths=**} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidDocument(15);
+      allow delete: if isDirector();
+    }
+
+    // 12. Kardex private evidence: /kardex/{studentId}/{allPaths=**}
+    match /kardex/{studentId}/{allPaths=**} {
+      allow read: if isSignedIn() && (isDirector() || isOwner(studentId));
+      allow create, update: if isSignedIn() && (isDirector() || ('role' in request.auth.token && request.auth.token.role == 'profesor')) && isValidDocument(10);
+      allow delete: if isDirector();
+    }
+
+    // 13. Institutional reports: /reports/{allPaths=**}
+    match /reports/{allPaths=**} {
+      allow read: if isSignedIn() && isDirector();
+      allow write: if isDirector() && isValidDocument(20);
+    }
+  }
+}

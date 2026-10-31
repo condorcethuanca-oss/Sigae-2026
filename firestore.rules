@@ -1,0 +1,521 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? getUserData().role
+        : null;
+    }
+
+    // Permisos del Director Institucional oficial
+    function isDirector() {
+      return isSignedIn() && (
+        request.auth.uid == 'At1j9MIIu1ZN0ZRZDas28ILQn2y1' ||
+        request.auth.uid == 'oVuD2FxNPqZbzBUfCzKPXc9t1V82' ||
+        request.auth.uid == '0zHkg7u1XsaJ15EiXtVNzY8qTWt2' ||
+        request.auth.uid == '385JXeNTGcNrZvV2casb8ICaQvE2' ||
+        ('role' in request.auth.token && request.auth.token.role == 'director') ||
+        ('email' in request.auth.token && (
+          request.auth.token.email == 'condorcethuanca@gmail.com' ||
+          request.auth.token.email == 'director@sigae.edu.bo' ||
+          request.auth.token.email == 'director.institucional@sigae.edu.bo' ||
+          request.auth.token.email == 'gamacondorilopez74@gmail.com'
+        ))
+      );
+    }
+
+    function isProfesor() {
+      return isSignedIn() && (
+        (
+          getUserRole() == 'profesor' &&
+          (!('active' in getUserData()) || getUserData().active == true) &&
+          (!('status' in getUserData()) || getUserData().status != 'inactivo')
+        ) ||
+        (
+          'role' in request.auth.token &&
+          request.auth.token.role == 'profesor' &&
+          (!('active' in request.auth.token) || request.auth.token.active != false)
+        )
+      );
+    }
+
+    function isTeacherOwner(teacherData) {
+      return isSignedIn() && (
+        ('authUid' in teacherData && teacherData.authUid == request.auth.uid) ||
+        (
+          'email' in teacherData &&
+          request.auth.token.email != null &&
+          teacherData.email == request.auth.token.email
+        )
+      );
+    }
+
+    function isAssignedTeacher(gradeData) {
+      return isProfesor() && (
+        (
+          'teacherUid' in gradeData &&
+          gradeData.teacherUid == request.auth.uid &&
+          (
+            !('teacherId' in gradeData) ||
+            (
+              exists(/databases/$(database)/documents/teachers/$(gradeData.teacherId)) &&
+              get(/databases/$(database)/documents/teachers/$(gradeData.teacherId)).data.status == 'activo'
+            )
+          )
+        ) ||
+        (
+          'teacherId' in gradeData &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          'teacherId' in getUserData() &&
+          gradeData.teacherId == getUserData().teacherId &&
+          exists(/databases/$(database)/documents/teachers/$(gradeData.teacherId)) &&
+          get(/databases/$(database)/documents/teachers/$(gradeData.teacherId)).data.status == 'activo'
+        )
+      );
+    }
+
+    // 1. User Profiles (/users/{userId})
+    match /users/{userId} {
+      // READ:
+      // - Cada usuario puede leer su propio perfil
+      // - Director y Superadministrador tienen acceso de lectura administrativo completo
+      // - No hay lectura pública ni abierta
+      allow read: if isSignedIn() && (
+        isOwner(userId) ||
+        isDirector()
+      );
+
+      // CREATE:
+      // - Superadministrador y Director pueden registrar perfiles autorizados
+      // - Auto-registro: estrictamente limitado a 'alumno' o 'padre'. NUNCA 'director' ni 'superadmin'
+      // - Auto-registro para 'profesor' REQUIERE validación con expediente pre-autorizado en /teachers
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        (
+          isOwner(userId) &&
+          request.resource.data.uid == userId &&
+          request.resource.data.role in ['alumno', 'padre', 'profesor'] &&
+          request.resource.data.role != 'director' &&
+          request.resource.data.role != 'superadmin' &&
+          (
+            // Auto-registro normal (estudiante / padre)
+            (
+              request.resource.data.role in ['alumno', 'padre'] &&
+              (!('teacherId' in request.resource.data) || request.resource.data.teacherId == null)
+            ) ||
+            // Registro de profesor solicitante (pendiente de autorización por Dirección)
+            (
+              request.resource.data.role == 'profesor' &&
+              request.resource.data.active == false &&
+              request.resource.data.approvalStatus == 'pendiente' &&
+              request.resource.data.schoolSie == '80730142' &&
+              (!('teacherId' in request.resource.data) || request.resource.data.teacherId == null || request.resource.data.teacherId is string)
+            ) ||
+            // Activación institucional de docente
+            (
+              request.resource.data.role == 'profesor' &&
+              request.auth.token.email_verified == true &&
+              request.resource.data.email == request.auth.token.email &&
+              request.resource.data.schoolSie == '80730142' &&
+              request.resource.data.teacherId is string &&
+              exists(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)) &&
+              get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data.email == request.auth.token.email &&
+              get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data.status in ['activo', 'pendiente_activacion'] &&
+              (
+                !('authUid' in get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data) ||
+                get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data.authUid == null ||
+                get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data.authUid == userId
+              )
+            )
+          )
+        )
+      );
+
+      // UPDATE:
+      // - El Director tiene potestad de actualización de usuarios (incluyendo roles y activación)
+      // - Usuarios normales SOLO pueden actualizar campos no críticos de perfil (foto, teléfono, CI)
+      // - NINGÚN usuario común puede alterar su propio rol, estado de activación o asignaciones institucionales
+      allow update: if isSignedIn() && (
+        isDirector() ||
+        (
+          isOwner(userId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName',
+            'phone',
+            'photoURL',
+            'ci',
+            'emailVerified',
+            'studentLinking',
+            'needsProfileCompletion',
+            'updatedAt'
+          ])
+        )
+      );
+
+      // DELETE:
+      // - Eliminación de cuentas reservada exclusivamente para el Superadministrador y Director
+      allow delete: if isDirector();
+    }
+
+    // 2. Teachers Collection (/teachers/{teacherId})
+    // - Expedientes docentes: sólo Director y Superadministrador pueden gestionar completamente.
+    // - Los docentes autorizados solo pueden leer su propio expediente y vincular su UID institucional.
+    match /teachers/{teacherId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        (
+          isTeacherOwner(resource.data) &&
+          resource.data.status in ['activo', 'pendiente_activacion', 'licencia']
+        )
+      );
+      allow create, delete: if isDirector();
+      allow update: if isDirector() || (
+        isSignedIn() &&
+        resource.data.email == request.auth.token.email &&
+        resource.data.status in ['activo', 'pendiente_activacion'] &&
+        (!('authUid' in resource.data) || resource.data.authUid == null || resource.data.authUid == request.auth.uid) &&
+        request.resource.data.authUid == request.auth.uid &&
+        request.resource.data.status == resource.data.status &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'authUid',
+          'uid',
+          'linkedAt',
+          'linkedEmail',
+          'updatedAt'
+        ])
+      );
+    }
+
+    // 3. Groups / Classes (/groups/{groupId})
+    // - Lectura: miembros autenticados de la institución educativa
+    // - Creación, modificación y eliminación: Director y Superadministrador
+    match /groups/{groupId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isDirector();
+    }
+
+    // 4. Internal Messaging & Circulars (/messages/{messageId})
+    // - Comunicados y circulares institucionales
+    match /messages/{messageId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        resource.data.senderId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid ||
+        resource.data.recipientId in ['all_community', 'all_parents', 'all_students'] ||
+        (
+          resource.data.recipientId == 'all_teachers' &&
+          isProfesor()
+        ) ||
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          'teacherId' in getUserData() &&
+          resource.data.recipientId == getUserData().teacherId
+        )
+      );
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        (
+          request.auth.uid == request.resource.data.senderId &&
+          (
+            !('senderRole' in request.resource.data) ||
+            request.resource.data.senderRole == getUserRole()
+          ) &&
+          request.resource.data.recipientId != 'all_community' &&
+          (
+            request.resource.data.recipientId != 'all_teachers' ||
+            isProfesor()
+          )
+        )
+      );
+      allow update, delete: if isDirector();
+    }
+
+    // 5. School Configuration (/schools/{schoolId})
+    // - Lectura: información general de la U.E. Luis Espinal Tarde de Collpani (SIE 80730142)
+    // - Escritura: Director y Superadministrador
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow write: if isDirector();
+    }
+
+    // 6. Grades and Academic Records (/grades/{courseId})
+    // - Lectura: Director, Superadministrador, profesor asignado, o estudiante/padre cuando está publicada
+    // - Creación y Actualización: Director, Superadministrador, o profesor asignado a su materia
+    // - Eliminación: reservada exclusivamente para el Director y Superadministrador
+    match /grades/{courseId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        isAssignedTeacher(resource.data) ||
+        (
+          ('isPublishedToSchool' in resource.data && resource.data.isPublishedToSchool == true) &&
+          (
+            ('authorizedStudentIds' in resource.data && request.auth.uid in resource.data.authorizedStudentIds) ||
+            ('studentUids' in resource.data && request.auth.uid in resource.data.studentUids) ||
+            (
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              'childUid' in getUserData() &&
+              'authorizedStudentIds' in resource.data &&
+              getUserData().childUid in resource.data.authorizedStudentIds
+            )
+          )
+        )
+      );
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        (
+          isProfesor() && (
+            exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+            'teacherId' in getUserData() &&
+            request.resource.data.teacherId == getUserData().teacherId &&
+            request.resource.data.teacherUid == request.auth.uid &&
+            exists(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)) &&
+            get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data.status == 'activo' &&
+            (
+              !('assignedSubjects' in get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data) ||
+              !('subjectName' in request.resource.data) ||
+              request.resource.data.subjectName in get(/databases/$(database)/documents/teachers/$(request.resource.data.teacherId)).data.assignedSubjects
+            )
+          )
+        )
+      );
+      allow update: if isSignedIn() && (
+        isDirector() ||
+        (
+          isAssignedTeacher(resource.data) &&
+          (!('courseId' in resource.data) || request.resource.data.courseId == resource.data.courseId) &&
+          (!('subjectName' in resource.data) || request.resource.data.subjectName == resource.data.subjectName) &&
+          (!('teacherId' in resource.data) || request.resource.data.teacherId == resource.data.teacherId) &&
+          (!('teacherUid' in resource.data) || request.resource.data.teacherUid == resource.data.teacherUid) &&
+          (!('gradeLevel' in resource.data) || request.resource.data.gradeLevel == resource.data.gradeLevel) &&
+          (!('parallel' in resource.data) || request.resource.data.parallel == resource.data.parallel)
+        )
+      );
+      allow delete: if isDirector();
+    }
+
+    // 7. Solicitudes de Acceso Institucional (/access_requests/{requestId})
+    // - READ:
+    //   * El Superadministrador y el Director pueden ver todas las solicitudes
+    //   * El solicitante puede ver únicamente la solicitud correspondiente a su propio UID
+    // - CREATE:
+    //   * Cualquier usuario autenticado puede solicitar acceso únicamente para sí mismo (uid == auth.uid)
+    //   * El estado inicial DEBE ser 'pendiente' (no puede auto-aprobarse)
+    // - UPDATE & RESOLVE:
+    //   * EXCLUSIVO para el Superadministrador y el Director
+    //   * Ningún usuario común puede modificar su propia solicitud para auto-concederse roles ni auto-aprobarse
+    // - DELETE:
+    //   * EXCLUSIVO para el Superadministrador y el Director
+    match /access_requests/{requestId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        (resource.data.uid == request.auth.uid) ||
+        (request.auth.token.email != null && resource.data.email == request.auth.token.email)
+      );
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        (
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.status == 'pendiente'
+        )
+      );
+      allow update, delete: if isDirector();
+    }
+
+    // 8. Padrón Institucional de Estudiantes (/students/{studentId})
+    // - Lectura: Miembros institucionales autenticados (Directora, profesores asignados, tutores)
+    // - Escritura: Reservada exclusivamente a la Dirección y Superadministrador
+    match /students/{studentId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isDirector();
+    }
+
+    // 9. Expedientes de Padres y Tutores (/parents/{parentId})
+    // - Lectura: Directora o el propio adulto titular
+    // - Creación y Actualización: Directora o el propio adulto titular
+    match /parents/{parentId} {
+      allow read: if isSignedIn() && (isDirector() || isOwner(parentId));
+      allow create, update: if isSignedIn() && (isDirector() || isOwner(parentId));
+      allow delete: if isDirector();
+    }
+
+    // 10. Solicitudes de Vinculación Familiar (/parentStudentLinkRequests/{requestId})
+    // - Lectura: Directora o el padre solicitante (parentUid == auth.uid)
+    // - Creación: Padre solicitante para sí mismo (parentUid == auth.uid con estado inicial 'pendiente') o Directora
+    // - Resolución y eliminación: Exclusivo de la Dirección
+    match /parentStudentLinkRequests/{requestId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        resource.data.parentUid == request.auth.uid
+      );
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        (
+          request.resource.data.parentUid == request.auth.uid &&
+          request.resource.data.status == 'pendiente'
+        )
+      );
+      allow update, delete: if isDirector();
+    }
+
+    // 11. Vinculaciones Familiares Aprobadas (/parentStudentLinks/{linkId})
+    // - Lectura: Directora o el padre titular vinculado
+    // - Creación: Directora o padre canjeando código seguro
+    // - Modificación y eliminación: Exclusivo de la Dirección
+    match /parentStudentLinks/{linkId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        resource.data.parentUid == request.auth.uid
+      );
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        request.resource.data.parentUid == request.auth.uid
+      );
+      allow update, delete: if isDirector();
+    }
+
+    // 12. Invitaciones y Códigos Individuales Seguros (/familyLinkInvitations/{invitationId})
+    // - Lectura: Usuarios autenticados para validar código alfanumérico seguro
+    // - Creación y eliminación: Reservado a la Dirección
+    // - Consumo (update): Directora o usuario autenticado marcándolo consumido para sí mismo
+    match /familyLinkInvitations/{invitationId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isDirector();
+      allow update: if isDirector() || (
+        isSignedIn() &&
+        request.resource.data.isConsumed == true &&
+        request.resource.data.consumedBy == request.auth.uid
+      );
+    }
+
+    // 13. Registro de Auditoría y Trazabilidad (/audit_logs/{logId})
+    // - READ:
+    //   * EXCLUSIVO para el Superadministrador (UID 385JXeNTGcNrZvV2casb8ICaQvE2) y Director
+    // - CREATE:
+    //   * Permitido únicamente para el Superadministrador y Director al registrar operaciones trazables
+    // - UPDATE & DELETE:
+    //   * ESTRICTAMENTE PROHIBIDO (los registros de auditoría son inmutables e indelebles)
+    match /audit_logs/{logId} {
+      allow read: if isDirector();
+      allow create: if isDirector() && request.resource.data.adminUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // 14. Horario Escolar (/schedules/{scheduleId})
+    match /schedules/{scheduleId} {
+      allow read: if isSignedIn();
+      allow write: if isDirector();
+    }
+
+    // 15. Asistencia Escolar (/attendance_sessions/{sessionId})
+    match /attendance_sessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && (isDirector() || isProfesor());
+      allow delete: if isDirector();
+    }
+
+    // 16. Solicitudes de Vinculación de Estudiantes (/student_linking_requests/{requestId})
+    match /student_linking_requests/{requestId} {
+      allow read: if isDirector() || (isSignedIn() && (resource.data.parentUid == request.auth.uid || request.auth.token.email == resource.data.parentEmail));
+      allow create: if isSignedIn();
+      allow update: if isDirector();
+      allow delete: if isDirector();
+    }
+
+    // 17. Notificaciones Institucionales (/notifications/{notificationId})
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.recipientUid == request.auth.uid ||
+        isDirector()
+      );
+      // Previene suplantación de identidad: usuarios comunes NO pueden fingir ser Dirección
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        (
+          request.resource.data.senderUid == request.auth.uid &&
+          (
+            !('senderRole' in request.resource.data) ||
+            request.resource.data.senderRole != 'director'
+          )
+        )
+      );
+      allow update: if isSignedIn() && (
+        resource.data.recipientUid == request.auth.uid ||
+        isDirector()
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.recipientUid == request.auth.uid ||
+        isDirector()
+      );
+    }
+
+    // 18. Kárdex y Convivencia Escolar (/kardex_records/{kardexId})
+    match /kardex_records/{kardexId} {
+      // Lectura scoped: Dirección, docentes titulares, tutores de estudiantes vinculados y estudiantes autorizados
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        isProfesor() ||
+        resource.data.teacherUid == request.auth.uid ||
+        resource.data.studentId == request.auth.uid ||
+        getUserRole() == 'padre' ||
+        getUserRole() == 'alumno'
+      );
+      allow create: if isSignedIn() && (isDirector() || isProfesor());
+      allow update: if isSignedIn() && (
+        isDirector() ||
+        isProfesor() ||
+        (
+          getUserRole() == 'padre' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'parentSigned',
+            'parentSignedAt',
+            'parentResponse',
+            'parentResponseAt',
+            'updatedAt'
+          ])
+        )
+      );
+      allow delete: if isDirector();
+    }
+
+    // 19. Eventos del Calendario (/calendar_events/{eventId})
+    match /calendar_events/{eventId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        !('scope' in resource.data) ||
+        resource.data.scope in ['institucional', 'publico', 'comunidad'] ||
+        resource.data.authorUid == request.auth.uid
+      );
+      allow create, update: if isSignedIn() && (isDirector() || isProfesor());
+      allow delete: if isDirector();
+    }
+
+    // 20. Vinculaciones Familiares (Alias snake_case /parent_student_links/{linkId})
+    match /parent_student_links/{linkId} {
+      allow read: if isSignedIn() && (
+        isDirector() ||
+        resource.data.parentUid == request.auth.uid
+      );
+      allow create: if isSignedIn() && (
+        isDirector() ||
+        request.resource.data.parentUid == request.auth.uid
+      );
+      allow update, delete: if isDirector();
+    }
+  }
+}
+

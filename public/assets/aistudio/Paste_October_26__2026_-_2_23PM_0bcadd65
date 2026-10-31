@@ -1,0 +1,1138 @@
+# SIGAE — PROMPT MAESTRO DE MEJORA INTEGRAL
+## Seguridad, arquitectura profesional, Firebase, calendario, horarios, Kárdex, mensajería y notificaciones
+
+# 1. INSTRUCCIÓN PRINCIPAL
+
+Actúa como un equipo de ingeniería de software profesional compuesto por:
+
+- Arquitecto de software sénior.
+- Desarrollador full-stack especializado en React y TypeScript.
+- Ingeniero experto en Firebase Authentication y Cloud Firestore.
+- Especialista en ciberseguridad.
+- Ingeniero de bases de datos.
+- Especialista en calidad y refactorización de código.
+- Diseñador UX/UI.
+- Ingeniero de pruebas automatizadas.
+- Director de una unidad educativa.
+- Profesor de secundaria.
+- Padre de familia.
+- Estudiante que utiliza una plataforma académica.
+
+Quiero que analices mi aplicación desde todas estas perspectivas y realices mejoras profesionales, prácticas y seguras.
+
+## Información del proyecto
+
+**Nombre:** SIGAE — Sistema Integral de Gestión Académica Escolar.
+
+**Institución:** U.E. Luis Espinal Tarde de Collpani.
+
+**Código SIE:** 80730142.
+
+**País:** Bolivia.
+
+**Gestión académica:** 2026.
+
+**Tecnologías principales:** React, TypeScript, Firebase Authentication y Cloud Firestore.
+
+**Roles oficiales:**
+
+1. `director`
+2. `profesor`
+3. `padre`
+4. `alumno`
+
+SIGAE es una aplicación web de gestión académica que busca centralizar horarios, estudiantes, docentes, asistencia, calificaciones, calendario, Kárdex, comunicaciones y notificaciones.
+
+### REGLA FUNDAMENTAL
+
+**No reconstruyas SIGAE desde cero.**
+
+Actualmente, el registro, el inicio de sesión y los paneles de usuarios están funcionando.
+
+Quiero mejorar la seguridad, la organización del código, la arquitectura de Firebase y la integración entre todos los módulos.
+
+No quiero que al mejorar una función se dañe otra.
+
+No quiero pantallas decorativas ni botones que aparenten funcionar.
+
+Cada operación debe estar conectada a datos reales y respetar los permisos institucionales.
+
+---
+
+# 2. ESTADO ACTUAL INFORMADO POR GOOGLE AI STUDIO
+
+Anteriormente se presentó un informe técnico sobre la implementación del calendario, horarios y mensajería.
+
+Según ese informe, existen:
+
+### `UnifiedSchoolCalendar`
+
+Calendario escolar unificado con:
+
+- Vista mensual.
+- Vista semanal.
+- Navegación entre fechas.
+- Día actual resaltado.
+- Eventos identificados por categorías.
+- Visualización adaptada a celulares.
+- Visualización de clases, actividades y comunicaciones.
+
+### `OfficialScheduleManager`
+
+Administrador de horarios con:
+
+- Gestión de los 24 cursos de secundaria.
+- Consulta de materias.
+- Revisión de docentes.
+- Detección de incidencias.
+- Resolución administrativa.
+- Publicación de horarios.
+
+### `NewCommunicationModal`
+
+Módulo para:
+
+- Redactar mensajes.
+- Seleccionar destinatarios.
+- Seleccionar grupos.
+- Programar mensajes.
+- Enviar inmediatamente.
+- Revisar antes de enviar.
+- Confirmar obligatoriamente el envío.
+
+### Firestore
+
+El informe indica que:
+
+- La colección `/schedules` contiene 48 documentos iniciales.
+- La colección `/messages` administra comunicaciones institucionales.
+- Se eliminaron llamadas automáticas a `seedInitialSchedule()`.
+
+### Pruebas informadas
+
+- `tsc --noEmit`: sin errores.
+- Compilación de producción: correcta.
+- `npm run test:logic`: 12/12 pruebas aprobadas.
+- `npm run test:backend`: 45/45 pruebas aprobadas.
+
+**IMPORTANTE:** son resultados declarados en un informe anterior.
+
+Debes verificar directamente el código, las colecciones, las pruebas y el funcionamiento real.
+
+No afirmes que una función está completamente terminada solo porque el informe lo indique.
+
+No vuelvas a crear los componentes existentes sin inspeccionarlos.
+
+---
+
+# 3. PRIMERA MEJORA — SEGURIDAD DE ROLES Y PERMISOS
+
+Esta mejora se basa en el primer video analizado.
+
+El video explica que algunas aplicaciones permiten acceder indebidamente a funciones administrativas porque confían en información modificable desde el navegador.
+
+Quiero impedir que eso ocurra en SIGAE.
+
+## 3.1. Autenticación
+
+Utiliza Firebase Authentication para identificar a cada usuario.
+
+Cuando alguien inicia sesión:
+
+1. Firebase autentica la cuenta.
+2. SIGAE obtiene su UID.
+3. Consulta su perfil institucional protegido.
+4. Comprueba su rol.
+5. Comprueba el estado de la cuenta.
+6. Comprueba su institución.
+7. Comprueba sus asignaciones o vínculos autorizados.
+8. Permite acceder únicamente a las funciones correspondientes.
+
+## 3.2. No confiar en datos del navegador
+
+Nunca utilices como única fuente de autorización:
+
+- `localStorage`.
+- `sessionStorage`.
+- Variables de React.
+- Campos de formularios.
+- Parámetros de URL.
+- Valores de rol enviados por el navegador.
+- Menús ocultos o visibles.
+
+Estos mecanismos pueden utilizarse para preferencias o presentación, pero no para conceder permisos reales.
+
+## 3.3. Protección de la directora
+
+Un alumno, padre o profesor no debe poder obtener privilegios de Dirección modificando un valor de su navegador.
+
+El rol institucional debe estar protegido.
+
+Nadie debe poder aprobar su propia cuenta ni cambiar arbitrariamente su rol.
+
+## 3.4. Protección de profesores
+
+Un profesor únicamente podrá modificar información de los cursos y materias que tenga oficialmente asignados.
+
+Ejemplo:
+
+Si enseña Matemáticas en 6.º A, no podrá modificar calificaciones de Biología o estudiantes de otro curso sin una asignación válida.
+
+## 3.5. Protección de padres
+
+Un padre únicamente podrá consultar información de hijos con vínculo familiar aprobado.
+
+Conocer el CI o RUDE de un estudiante no debe conceder acceso automático a sus datos privados.
+
+## 3.6. Protección de estudiantes
+
+Los alumnos solamente podrán consultar sus datos autorizados.
+
+No deben poder modificar calificaciones, asistencia, asignaciones docentes o información de sus compañeros.
+
+## 3.7. Firestore Security Rules
+
+Revisa y mejora las reglas existentes.
+
+Comprueba que las restricciones funcionen también cuando alguien intenta acceder directamente a Firestore.
+
+No confíes solamente en los controles visuales del frontend.
+
+Para operaciones privilegiadas realizadas mediante Firebase Admin SDK, implementa verificaciones de autorización en el backend.
+
+Nunca expongas credenciales de servicio o claves administrativas en React.
+
+---
+
+# 4. SEGUNDA MEJORA — SINGLETON Y ARQUITECTURA FIREBASE
+
+Esta mejora se basa en el segundo video.
+
+El video explica el patrón Singleton y la importancia de evitar instancias innecesarias de recursos compartidos.
+
+## 4.1. Revisar la inicialización de Firebase
+
+Inspecciona:
+
+- Dónde se inicializa Firebase App.
+- Cómo se obtiene Firebase Authentication.
+- Cómo se obtiene Firestore.
+- Si existen inicializaciones duplicadas.
+- Si hay configuraciones repetidas.
+- Si se crean listeners innecesarios.
+- Si existen consultas que se repiten sin necesidad.
+
+Quiero que Firebase tenga una inicialización centralizada, compatible con el SDK y la arquitectura real del proyecto.
+
+No desarrolles una clase Singleton innecesaria si el propio SDK de Firebase ya administra correctamente sus instancias.
+
+## 4.2. Organización de servicios
+
+Revisa y organiza las responsabilidades de los servicios existentes.
+
+Como referencia:
+
+- `authService`: autenticación.
+- `userService`: perfiles.
+- `studentService`: estudiantes.
+- `teacherService`: profesores.
+- `courseService`: cursos.
+- `scheduleService`: horarios.
+- `attendanceService`: asistencia.
+- `gradeService`: calificaciones.
+- `kardexService`: Kárdex.
+- `calendarService`: eventos.
+- `messageService`: mensajería.
+- `notificationService`: notificaciones.
+
+Son nombres propuestos, no órdenes para crear archivos duplicados.
+
+Si ya existen servicios equivalentes, reutilízalos.
+
+## 4.3. Separar responsabilidades
+
+No quiero que un único componente React contenga:
+
+- Toda la interfaz.
+- Todas las consultas a Firebase.
+- Validación de permisos.
+- Gestión de mensajes.
+- Gestión de horarios.
+- Gestión del Kárdex.
+- Toda la navegación.
+
+Divide las responsabilidades cuando sea necesario.
+
+Mantén componentes reutilizables y fáciles de comprobar.
+
+## 4.4. Aislamiento de sesiones
+
+Evita compartir datos privados entre usuarios.
+
+Cuando alguien cierre sesión:
+
+- Limpia el estado privado de la sesión.
+- Cancela suscripciones que ya no correspondan.
+- Evita mostrar información almacenada del usuario anterior.
+- Invalida o limpia cachés privadas cuando corresponda.
+
+Nunca utilices un objeto global para compartir las identidades o permisos privados de diferentes usuarios.
+
+---
+
+# 5. TERCERA MEJORA — MAPA PROFESIONAL DE ARQUITECTURA
+
+Esta mejora se basa en el tercer video, que presenta herramientas para generar diagramas de arquitectura a partir del código real.
+
+Quiero que documentes claramente cómo está construido SIGAE.
+
+No es obligatorio instalar Archify. Puedes utilizar Mermaid u otra herramienta compatible.
+
+## 5.1. Diagrama general de SIGAE
+
+Representa:
+
+React y TypeScript
+→ Componentes y paneles
+→ Servicios
+→ Autenticación y autorización
+→ Firebase y backend
+→ Cloud Firestore.
+
+El diagrama debe reflejar los archivos y servicios que realmente existen.
+
+## 5.2. Diagrama de inicio de sesión
+
+Representa:
+
+Usuario
+→ Firebase Authentication
+→ Perfil institucional
+→ Verificación de rol
+→ Estado de cuenta
+→ Panel correspondiente.
+
+Incluye estados de cuentas pendientes, incompletas y suspendidas.
+
+## 5.3. Diagrama de horarios
+
+Representa:
+
+Excel
+→ Importación
+→ Validación
+→ Detección de conflictos
+→ Revisión de Dirección
+→ Aprobación
+→ Firestore
+→ Paneles.
+
+## 5.4. Diagrama de notificaciones
+
+Representa:
+
+Remitente
+→ Selección de destinatarios
+→ Confirmación
+→ Validación de permisos
+→ Guardado
+→ Entrega
+→ Lectura o respuesta.
+
+## 5.5. Diagrama del Kárdex
+
+Representa:
+
+Profesor
+→ Observación
+→ Revisión institucional cuando corresponda
+→ Notificación autorizada
+→ Padre
+→ Seguimiento.
+
+## 5.6. Diagrama de base de datos
+
+Muestra cómo se relacionan:
+
+- Usuarios.
+- Estudiantes.
+- Profesores.
+- Padres.
+- Cursos.
+- Matrículas.
+- Materias.
+- Asignaciones.
+- Horarios.
+- Asistencia.
+- Calificaciones.
+- Kárdex.
+- Calendario.
+- Mensajes.
+- Notificaciones.
+
+Guarda la documentación en una carpeta apropiada del proyecto.
+
+Distingue funciones implementadas, parciales y pendientes.
+
+---
+
+# 6. CUARTA MEJORA — CALIDAD DEL CÓDIGO
+
+Esta mejora se basa en el cuarto video, que presenta los principios de Anti-Slop y Thermos.
+
+Quiero que revises la calidad del código generado anteriormente.
+
+## 6.1. Detectar problemas
+
+Busca:
+
+- Componentes excesivamente complejos.
+- Servicios duplicados.
+- Código repetido.
+- Condicionales difíciles de mantener.
+- Tipos TypeScript innecesariamente ambiguos.
+- Errores ocultos.
+- Consultas repetidas.
+- Manejo incompleto de errores.
+- Dependencias circulares.
+- Estados globales peligrosos.
+- Funciones que aparentan guardar datos, pero no lo hacen.
+- Datos ficticios presentados como reales.
+
+## 6.2. Refactorización
+
+No reescribas todo el proyecto simplemente porque algunos archivos sean grandes.
+
+Primero identifica qué responsabilidades están mal organizadas.
+
+Después realiza cambios pequeños y comprobables.
+
+Conserva los contratos que ya utilizan otros componentes o actualízalos de forma coordinada.
+
+Ejecuta pruebas antes y después.
+
+## 6.3. Interfaz profesional
+
+Conserva el diseño visual de SIGAE.
+
+Quiero:
+
+- Menús comprensibles.
+- Botones reales.
+- Formularios organizados.
+- Estados de carga.
+- Confirmaciones.
+- Mensajes de error.
+- Diseño adaptable a celulares.
+- Colores coherentes.
+- Buena accesibilidad.
+
+No quiero pantallas saturadas ni estadísticas inventadas.
+
+---
+
+# 7. AUDITORÍA DE LA BASE DE DATOS FIREBASE
+
+Antes de crear nuevas colecciones, inspecciona las existentes.
+
+El informe anterior menciona:
+
+`/schedules`
+
+`/messages`
+
+Pero no debes asumir que son las únicas.
+
+Identifica:
+
+- Colecciones activas.
+- Documentos existentes.
+- Rutas de lectura.
+- Rutas de escritura.
+- Datos duplicados.
+- Campos inconsistentes.
+- Índices.
+- Reglas de seguridad.
+- Procesos automáticos.
+- Migraciones pendientes.
+
+## 7.1. Los 48 documentos de horarios
+
+El informe menciona 48 documentos en `/schedules`.
+
+Determina exactamente qué representan.
+
+Podrían corresponder a cursos, turnos, versiones u otra estructura.
+
+No los elimines ni sustituyas basándote únicamente en su cantidad.
+
+## 7.2. Migraciones
+
+Si encuentras estructuras duplicadas, prepara una migración segura.
+
+Antes de modificar datos reales:
+
+1. Identifica la información vigente.
+2. Determina las dependencias.
+3. Diseña el nuevo esquema.
+4. Prepara una copia de respaldo adecuada.
+5. Verifica compatibilidad.
+6. Solicita autorización.
+
+No elimines información académica existente.
+
+---
+
+# 8. HORARIOS OFICIALES DE LOS 24 CURSOS
+
+Quiero que SIGAE utilice el archivo:
+
+`SIGAE_horarios_por_curso.xlsx`
+
+Contiene los cursos de secundaria:
+
+1A, 1B, 1C, 1D.
+
+2A, 2B, 2C, 2D.
+
+3A, 3B, 3C, 3D.
+
+4A, 4B, 4C, 4D.
+
+5A, 5B, 5C, 5D.
+
+6A, 6B, 6C, 6D.
+
+Debes analizar todas las hojas del archivo.
+
+Si todavía no está disponible en tu entorno, indícalo claramente y no inventes datos.
+
+## 8.1. Información necesaria
+
+Cada clase deberá relacionarse con:
+
+- Institución.
+- Gestión académica.
+- Curso.
+- Paralelo.
+- Día.
+- Período.
+- Turno.
+- Materia.
+- Docente.
+- Horas oficiales, si se confirmaron.
+- Versión de horario.
+- Estado de aprobación.
+
+## 8.2. Períodos y horarios
+
+El Excel utiliza períodos P1–P6.
+
+No inventes las horas exactas de reloj.
+
+Permite que Dirección configure sus equivalencias oficiales.
+
+Conserva bloques completos y períodos divididos de 40 minutos.
+
+No confundir las clases de mañana con las clases de tarde.
+
+## 8.3. Incidencias conocidas
+
+Revisa especialmente:
+
+- 4.º B, viernes P5–P6: cruce entre Física y Lenguaje.
+- 6.º C, miércoles P5–P6: cruce entre Química y Ciencias Sociales.
+- Abreviaturas como SOC, FIS, LEN y QIM.
+
+También verifica si «Cosmovisiones y Psicología» corresponde a una sola denominación institucional o a materias diferentes.
+
+No realices cambios arbitrarios.
+
+## 8.4. Publicación
+
+Los horarios deben pasar por:
+
+Importación
+→ Validación
+→ Incidencias
+→ Revisión
+→ Aprobación
+→ Publicación.
+
+No restablezcas funciones automáticas que sobrescriban los horarios al iniciar sesión.
+
+---
+
+# 9. CALENDARIO ESCOLAR
+
+Conserva y mejora `UnifiedSchoolCalendar`.
+
+## Vista mensual
+
+Debe tener:
+
+- Mes y año.
+- Días de domingo a sábado.
+- Día actual resaltado en azul.
+- Eventos con pequeñas etiquetas.
+- Indicador «+N más».
+- Detalles al seleccionar una fecha.
+
+## Vista semanal
+
+En computadoras:
+
+- Siete columnas.
+- Materias correspondientes.
+- Profesores.
+- Períodos.
+- Actividades.
+- Comunicaciones.
+
+En celulares:
+
+- Fila horizontal con siete días.
+- Selección de un día.
+- Cronograma debajo.
+- Tarjetas fáciles de leer.
+
+Organiza la información en:
+
+**Mis clases**
+
+**Actividades y evaluaciones**
+
+**Comunicaciones**
+
+No mezcles horarios fijos con mensajes o eventos.
+
+## Según el usuario
+
+### Directora
+
+Puede consultar todos los cursos y el calendario institucional.
+
+### Profesor
+
+Consulta su horario y sus actividades de cursos asignados.
+
+### Padre
+
+Consulta el calendario del hijo seleccionado.
+
+### Alumno
+
+Consulta su horario y actividades autorizadas.
+
+---
+
+# 10. SISTEMA DE MENSAJERÍA
+
+Conserva y mejora `NewCommunicationModal`.
+
+Todos los roles podrán participar en la mensajería según sus permisos.
+
+## 10.1. Selección de destinatarios
+
+Quiero tres opciones:
+
+1. Individual.
+2. Varias personas.
+3. Grupo.
+
+Dirección podrá seleccionar grupos institucionales autorizados, como:
+
+- Todos los profesores.
+- Todos los padres.
+- Todos los estudiantes.
+- Dirección.
+- Padres de un curso.
+- Estudiantes de un curso.
+
+El profesor podrá contactar a estudiantes y padres vinculados de sus cursos, así como a Dirección y colegas autorizados.
+
+El padre podrá contactar a los docentes relacionados con sus hijos y a Dirección.
+
+El estudiante podrá contactar a sus profesores y a Dirección según los permisos.
+
+No permitas mensajes masivos institucionales desde cuentas sin autorización.
+
+## 10.2. Pantalla de creación
+
+Campos:
+
+- Título.
+- Mensaje.
+- Tipo.
+- Prioridad.
+- Destinatarios.
+- Fecha de envío.
+- Fecha del evento, si corresponde.
+- Adjuntos autorizados, si están disponibles.
+
+Botones:
+
+- Guardar borrador.
+- Seleccionar destinatarios.
+- Vista previa.
+- Enviar ahora.
+- Programar.
+- Cancelar.
+
+## 10.3. Confirmación obligatoria
+
+Antes de enviar, muestra:
+
+**«¿Estás seguro de enviar este mensaje?»**
+
+Incluye:
+
+- Título.
+- Remitente.
+- Rol.
+- Destinatarios seleccionados.
+- Cantidad real de destinatarios.
+- Fecha.
+- Hora.
+- Prioridad.
+
+Botones:
+
+**Volver y editar**
+
+**Confirmar envío**
+
+Para mensajes futuros:
+
+**Confirmar programación**
+
+No envíes antes de esta confirmación.
+
+## 10.4. Envío programado
+
+Los mensajes programados deben guardarse en Firebase.
+
+Un proceso seguro debe enviarlos en el momento correspondiente aunque el navegador esté cerrado.
+
+No dependas de un temporizador de React.
+
+Verifica los permisos nuevamente en el momento del envío.
+
+Evita mensajes duplicados.
+
+No habilites servicios facturables adicionales sin autorización.
+
+---
+
+# 11. NOTIFICACIONES
+
+La campana de SIGAE debe funcionar realmente.
+
+Debe mostrar:
+
+- Título.
+- Remitente.
+- Rol.
+- Fecha.
+- Prioridad.
+- Estado de lectura.
+- Acceso al detalle.
+
+Diferencia:
+
+- Borrador.
+- Programado.
+- En proceso.
+- Enviado.
+- Fallido.
+- Cancelado.
+- No leído.
+- Leído.
+- Confirmado, si requiere confirmación adicional.
+
+No declares entregado un mensaje solamente porque se guardó en Firestore.
+
+Los mensajes individuales y sus estados de lectura deben ser privados.
+
+## Colores
+
+Utiliza:
+
+- Rojo: Dirección.
+- Azul: Profesor.
+- Verde: Padre.
+- Morado: Estudiante.
+
+La prioridad debe tener un indicador independiente.
+
+Los colores identifican al remitente, no la gravedad.
+
+Incluye nombres y etiquetas para que la información también sea comprensible sin distinguir colores.
+
+---
+
+# 12. SISTEMA KÁRDEX
+
+Integra el Kárdex con la mensajería y las notificaciones.
+
+El profesor podrá registrar:
+
+- Comportamiento en clase.
+- Tareas no presentadas.
+- Llamadas de atención.
+- Seguimientos.
+- Aspectos positivos.
+- Solicitudes de citación.
+
+Conserva los cuatro niveles propuestos:
+
+1. Informativo.
+2. Llamada de atención.
+3. Atención familiar.
+4. Atención prioritaria.
+
+Estos niveles deben adecuarse al reglamento institucional.
+
+Una tarea no presentada no debe convertirse automáticamente en una sanción grave.
+
+Las observaciones individuales solo podrán comunicarse a los padres autorizados.
+
+No publiques información privada del Kárdex en calendarios generales.
+
+El padre podrá:
+
+- Consultar observaciones comunicables.
+- Marcar avisos como leídos.
+- Responder.
+- Solicitar aclaración.
+- Consultar seguimientos.
+
+---
+
+# 13. RELACIONES ENTRE LOS MÓDULOS
+
+Quiero que todos los módulos de SIGAE estén relacionados correctamente.
+
+La estructura lógica debe ser:
+
+**Institución**
+→ Gestión académica
+→ Cursos
+→ Matrículas
+→ Estudiantes.
+
+**Profesores**
+→ Asignaciones
+→ Materias
+→ Cursos
+→ Horarios.
+
+**Estudiantes**
+→ Matrículas
+→ Asistencia
+→ Calificaciones
+→ Actividades.
+
+**Padres**
+→ Vínculos familiares aprobados
+→ Hijos
+→ Información académica autorizada.
+
+**Calendario**
+→ Eventos
+→ Cursos
+→ Materias
+→ Profesores.
+
+**Mensajería**
+→ Remitentes
+→ Destinatarios
+→ Notificaciones
+→ Lectura.
+
+**Kárdex**
+→ Estudiante
+→ Profesor responsable
+→ Observación
+→ Seguimiento
+→ Notificación familiar autorizada.
+
+No dupliques los mismos datos en colecciones innecesarias.
+
+Conserva identificadores estables.
+
+Evita mezclar cursos, materias, paralelos y gestiones.
+
+---
+
+# 14. FUNCIONAMIENTO SEGÚN CADA ROL
+
+## Directora
+
+Necesita:
+
+- Administrar usuarios.
+- Autorizar profesores.
+- Organizar cursos.
+- Asignar materias.
+- Gestionar horarios.
+- Resolver incidencias.
+- Publicar eventos.
+- Enviar comunicados.
+- Revisar seguimientos.
+- Consultar información institucional.
+
+## Profesor
+
+Necesita:
+
+- Consultar clases del día.
+- Consultar sus cursos.
+- Ver estudiantes.
+- Registrar asistencia.
+- Registrar calificaciones.
+- Consultar horarios.
+- Programar tareas y evaluaciones.
+- Enviar mensajes autorizados.
+- Registrar observaciones del Kárdex.
+
+## Padre
+
+Necesita:
+
+- Seleccionar a sus hijos.
+- Consultar horarios.
+- Ver asistencia.
+- Consultar calificaciones publicadas.
+- Ver tareas.
+- Ver evaluaciones.
+- Consultar el Kárdex comunicable.
+- Recibir notificaciones.
+- Responder mensajes.
+
+## Alumno
+
+Necesita:
+
+- Consultar sus materias.
+- Ver su horario.
+- Consultar actividades.
+- Ver tareas.
+- Consultar calificaciones autorizadas.
+- Recibir comunicados.
+- Comunicarse con profesores autorizados.
+
+Cada panel debe mostrar información real y únicamente las funciones permitidas.
+
+---
+
+# 15. PRUEBAS OBLIGATORIAS
+
+Antes de declarar una mejora terminada, realiza pruebas.
+
+## Seguridad
+
+- Comprobar permisos de los cuatro roles.
+- Impedir cambios arbitrarios de rol.
+- Impedir acceso a estudiantes ajenos.
+- Impedir modificaciones académicas no autorizadas.
+- Verificar reglas de Firestore.
+- Verificar controles del backend.
+
+## Firebase
+
+- Verificar inicialización central.
+- Detectar listeners duplicados.
+- Revisar consultas.
+- Comprobar escrituras reales.
+- Identificar documentos huérfanos.
+- Evitar duplicados.
+- Comprobar índices y costos potenciales.
+
+## Horarios
+
+- Verificar los 24 cursos.
+- Conservar períodos separados.
+- Revisar conflictos.
+- Confirmar docentes.
+- Verificar las versiones publicadas.
+
+## Calendario
+
+- Vista mensual.
+- Vista semanal.
+- Navegación móvil.
+- Consulta por curso.
+- Eventos reales.
+- Correcta zona horaria `America/La_Paz`.
+
+## Mensajería
+
+- Selección individual.
+- Selección por grupos.
+- Destinatarios autorizados.
+- Confirmación obligatoria.
+- Envío inmediato.
+- Envío programado.
+- Estados de lectura.
+- Historial.
+- Ausencia de duplicados.
+
+## Kárdex
+
+- Registro autorizado.
+- Seguimiento.
+- Notificación al tutor correcto.
+- Protección de datos personales.
+- Respuestas y aclaraciones.
+
+Utiliza Firebase Emulator Suite u otro entorno de pruebas aislado cuando sea posible.
+
+No envíes comunicaciones de prueba a familias reales sin autorización.
+
+No modifiques calificaciones ni expedientes reales durante las pruebas.
+
+---
+
+# 16. ORDEN DE IMPLEMENTACIÓN
+
+Trabaja mediante checkpoints.
+
+## CHECKPOINT 1 — Auditoría
+
+Analiza el código, Firebase, servicios, colecciones, reglas y pruebas existentes.
+
+Entrega un diagnóstico antes de modificar recursos de producción.
+
+## CHECKPOINT 2 — Seguridad
+
+Corrige problemas verificados de autenticación, permisos y autorización.
+
+## CHECKPOINT 3 — Arquitectura Firebase
+
+Centraliza la inicialización y elimina duplicaciones innecesarias.
+
+## CHECKPOINT 4 — Documentación
+
+Genera diagramas reales de arquitectura, flujos y base de datos.
+
+## CHECKPOINT 5 — Calidad de código
+
+Refactoriza componentes y servicios que realmente lo necesiten.
+
+## CHECKPOINT 6 — Horarios
+
+Comprueba `/schedules`, revisa los 48 documentos y completa la importación de los 24 cursos desde el Excel.
+
+## CHECKPOINT 7 — Calendario
+
+Revisa `UnifiedSchoolCalendar` y conecta las vistas con horarios y eventos reales.
+
+## CHECKPOINT 8 — Mensajería
+
+Revisa `NewCommunicationModal` y garantiza destinatarios autorizados, confirmación y persistencia.
+
+## CHECKPOINT 9 — Notificaciones
+
+Comprueba la campana, bandeja, lectura e historial.
+
+## CHECKPOINT 10 — Programación
+
+Implementa o verifica los mensajes futuros mediante un backend seguro y autorizado.
+
+## CHECKPOINT 11 — Integración académica
+
+Comprueba las relaciones entre usuarios, cursos, materias, horarios, asistencia, calificaciones, Kárdex y notificaciones.
+
+## CHECKPOINT 12 — Pruebas finales
+
+Ejecuta pruebas de compilación, lógica, integración, seguridad, permisos y funcionamiento móvil.
+
+---
+
+# 17. INFORME OBLIGATORIO DESPUÉS DE CADA CHECKPOINT
+
+Debes informar:
+
+1. Qué inspeccionaste.
+2. Qué problemas encontraste.
+3. Qué archivos modificaste.
+4. Qué servicios reutilizaste.
+5. Qué colecciones de Firebase utilizaste.
+6. Qué permisos verificaste.
+7. Qué funciones están realmente implementadas.
+8. Qué pruebas ejecutaste.
+9. Cuáles fueron los resultados.
+10. Qué errores permanecen.
+11. Qué trabajo falta realizar.
+
+Diferencia claramente:
+
+**Verificado:** comprobado mediante código o pruebas.
+
+**Implementado:** desarrollado, pero posiblemente pendiente de validación adicional.
+
+**Pendiente:** todavía no completado.
+
+**Propuesto:** idea futura.
+
+No declares que SIGAE es completamente seguro o que todas sus funciones están terminadas sin pruebas suficientes.
+
+---
+
+# 18. RESTRICCIONES FINALES
+
+No debes:
+
+- Reconstruir SIGAE desde cero.
+- Crear roles nuevos innecesarios.
+- Duplicar colecciones sin justificación.
+- Guardar contraseñas en Firestore.
+- Confiar en roles modificables del navegador.
+- Inventar estudiantes, notas u horarios.
+- Publicar observaciones privadas.
+- Enviar mensajes a destinatarios no autorizados.
+- Crear servicios que no sean necesarios.
+- Introducir código improvisado.
+- Activar servicios de pago sin autorización.
+- Borrar datos institucionales.
+- Modificar reglas de producción sin revisión.
+- Ejecutar migraciones destructivas.
+- Afirmar que pruebas inexistentes fueron ejecutadas.
+
+---
+
+# INSTRUCCIÓN FINAL PARA GOOGLE AI STUDIO
+
+Quiero que conviertas SIGAE en una aplicación académica más segura, organizada, mantenible y funcional.
+
+Debes aplicar las enseñanzas de los cuatro videos:
+
+**Video 1 — Seguridad:** impedir escalamiento de privilegios y operaciones no autorizadas.
+
+**Video 2 — Singleton:** centralizar correctamente los servicios Firebase y evitar recursos o estados compartidos indebidamente.
+
+**Video 3 — Arquitectura:** documentar el sistema real mediante diagramas y relaciones entre módulos.
+
+**Video 4 — Calidad de código:** eliminar duplicaciones, corregir problemas estructurales y mejorar la mantenibilidad sin romper funcionalidades.
+
+Además, debes conectar estas mejoras con:
+
+- Calendario.
+- Horarios.
+- Asistencia.
+- Calificaciones.
+- Kárdex.
+- Mensajería.
+- Notificaciones.
+- Gestión institucional.
+
+**EMPIEZA POR EL CHECKPOINT 1: REALIZA UNA AUDITORÍA COMPLETA DEL PROYECTO EXISTENTE, SIN MODIFICAR DATOS DE PRODUCCIÓN.**
+
+Entrega primero el diagnóstico técnico, indicando qué componentes funcionan, cuáles necesitan mejoras, cómo están relacionadas las colecciones de Firebase y qué problemas de seguridad o arquitectura has comprobado.
+
+Después realiza las mejoras por etapas, con pruebas antes y después de cada cambio.
+
+Para cualquier migración de datos reales, modificación de reglas de producción, despliegue o activación de servicios facturables, presenta previamente el plan y solicita autorización.
+
+**NO QUIERO UNA DEMOSTRACIÓN VISUAL. QUIERO UN SISTEMA REAL, SEGURO, CONECTADO A FIREBASE Y CORRECTAMENTE ORGANIZADO.**

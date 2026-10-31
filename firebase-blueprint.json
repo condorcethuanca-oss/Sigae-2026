@@ -1,0 +1,184 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Perfil de usuario institucional SIGAE",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID de usuario Firebase Auth" },
+        "email": { "type": "string", "description": "Correo electrónico institucional" },
+        "displayName": { "type": "string", "description": "Nombre y apellidos completos" },
+        "role": { "type": "string", "enum": ["director", "profesor", "padre", "alumno"], "description": "Rol jerárquico" },
+        "ci": { "type": "string", "description": "Cédula de Identidad de Bolivia" },
+        "phone": { "type": "string", "description": "Número telefónico" },
+        "active": { "type": "boolean", "description": "Estado de la cuenta" },
+        "schoolSie": { "type": "string", "description": "Código SIE de la Unidad Educativa" },
+        "teacherId": { "type": "string", "description": "ID institucional del expediente docente si aplica" },
+        "createdAt": { "type": "string", "description": "Fecha de registro" }
+      },
+      "required": ["uid", "email", "displayName", "role"]
+    },
+    "TeacherProfile": {
+      "title": "TeacherProfile",
+      "description": "Ficha y asignación de profesores gestionada por el Director",
+      "type": "object",
+      "properties": {
+        "teacherId": { "type": "string", "description": "ID institucional del profesor" },
+        "authUid": { "type": "string", "description": "UID real de Firebase Authentication tras vinculación" },
+        "linkedAt": { "type": "string", "description": "Fecha en que se vinculó la cuenta de Firebase Auth" },
+        "linkedEmail": { "type": "string", "description": "Correo autenticado con el que se vinculó" },
+        "fullName": { "type": "string", "description": "Nombre completo" },
+        "email": { "type": "string", "description": "Correo institucional" },
+        "ci": { "type": "string", "description": "Cédula de Identidad con extensión" },
+        "phone": { "type": "string", "description": "Teléfono de contacto" },
+        "specialty": { "type": "string", "description": "Especialidad pedagógica" },
+        "assignedGrades": { "type": "string", "description": "Cursos asignados" },
+        "assignedSubjects": { "type": "string", "description": "Materias o áreas curriculares" },
+        "hourlyLoad": { "type": "string", "description": "Carga horaria semanal" },
+        "status": { "type": "string", "description": "Estado activo o en licencia" },
+        "notes": { "type": "string", "description": "Observaciones de Dirección" },
+        "updatedAt": { "type": "string", "description": "Fecha de última actualización" }
+      },
+      "required": ["teacherId", "fullName", "specialty"]
+    },
+    "SchoolGroup": {
+      "title": "SchoolGroup",
+      "description": "Grupos, aulas y paralelos de la Unidad Educativa gestionados por Dirección",
+      "type": "object",
+      "properties": {
+        "groupId": { "type": "string", "description": "Identificador del curso" },
+        "name": { "type": "string", "description": "Nombre del curso (ej. 5° de Secundaria)" },
+        "level": { "type": "string", "enum": ["primaria", "secundaria"], "description": "Nivel escolar" },
+        "parallel": { "type": "string", "description": "Paralelo A, B o C" },
+        "shift": { "type": "string", "description": "Turno mañana o tarde" },
+        "year": { "type": "string", "description": "Gestión escolar 2026" },
+        "tutorTeacherId": { "type": "string", "description": "ID del profesor tutor de aula" },
+        "tutorTeacherName": { "type": "string", "description": "Nombre del profesor tutor" },
+        "studentCount": { "type": "string", "description": "Cantidad de alumnos matriculados" }
+      },
+      "required": ["groupId", "name", "level", "parallel"]
+    },
+    "InternalMessage": {
+      "title": "InternalMessage",
+      "description": "Comunicados y mensajes internos oficiales de Dirección",
+      "type": "object",
+      "properties": {
+        "messageId": { "type": "string", "description": "ID del mensaje" },
+        "senderId": { "type": "string", "description": "ID del remitente Director" },
+        "senderName": { "type": "string", "description": "Nombre del Director remitente" },
+        "recipientId": { "type": "string", "description": "ID del destinatario o all_teachers" },
+        "recipientName": { "type": "string", "description": "Nombre del destinatario o Claustro Docente" },
+        "subject": { "type": "string", "description": "Asunto o título del comunicado" },
+        "content": { "type": "string", "description": "Contenido del mensaje oficial" },
+        "type": { "type": "string", "description": "comunicado_general, circular o directo" },
+        "priority": { "type": "string", "description": "normal o urgente" },
+        "createdAt": { "type": "string", "description": "Fecha y hora de envío" }
+      },
+      "required": ["messageId", "senderId", "subject", "content"]
+    },
+    "SchoolConfig": {
+      "title": "SchoolConfig",
+      "description": "Configuración de la Unidad Educativa en Bolivia",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string", "description": "Nombre oficial de la Unidad Educativa" },
+        "sie": { "type": "string", "description": "Código SIE oficial" },
+        "academicYear": { "type": "string", "description": "Gestión escolar" },
+        "currentPeriod": { "type": "string", "description": "Trimestre actual" },
+        "directorName": { "type": "string", "description": "Nombre de la Dirección" },
+        "department": { "type": "string", "description": "Departamento de Bolivia" },
+        "district": { "type": "string", "description": "Distrito educativo" }
+      },
+      "required": ["schoolName", "sie"]
+    },
+    "CourseGradebook": {
+      "title": "CourseGradebook",
+      "description": "Libreta de calificaciones por curso y materia institucional SIGAE",
+      "type": "object",
+      "properties": {
+        "courseId": { "type": "string", "description": "Identificador único de la libreta curricular" },
+        "courseName": { "type": "string", "description": "Nombre de la materia o área formativa" },
+        "teacherId": { "type": "string", "description": "ID institucional del profesor asignado" },
+        "teacherUid": { "type": "string", "description": "UID de Firebase Authentication del docente titular" },
+        "period": { "type": "string", "description": "Trimestre o periodo académico" },
+        "isPublishedToSchool": { "type": "boolean", "description": "Bandera de publicación formal" },
+        "publishedAt": { "type": "string", "description": "Fecha de publicación oficial" },
+        "authorizedStudentIds": { "type": "array", "description": "Lista de IDs de estudiantes autorizados para consultar calificaciones oficiales" }
+      },
+      "required": ["courseId", "courseName"]
+    },
+    "NotificationItem": {
+      "title": "NotificationItem",
+      "description": "Notificación interna individual con código de color por rol",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID de notificación" },
+        "recipientUid": { "type": "string", "description": "UID de usuario destinatario" },
+        "senderUid": { "type": "string", "description": "UID del remitente" },
+        "senderName": { "type": "string", "description": "Nombre del remitente" },
+        "senderRole": { "type": "string", "enum": ["director", "profesor", "padre", "alumno"], "description": "Rol oficial para código de color" },
+        "title": { "type": "string", "description": "Título de la notificación" },
+        "message": { "type": "string", "description": "Contenido del aviso" },
+        "type": { "type": "string", "description": "Tipo de evento" },
+        "priority": { "type": "string", "description": "Nivel de urgencia" },
+        "read": { "type": "boolean", "description": "Estado de lectura" },
+        "createdAt": { "type": "string", "description": "Fecha y hora" }
+      },
+      "required": ["recipientUid", "senderRole", "title", "message"]
+    },
+    "KardexEntry": {
+      "title": "KardexEntry",
+      "description": "Observación disciplinaria y pedagógica institucional de 4 niveles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "ID del registro de Kárdex" },
+        "studentId": { "type": "string", "description": "ID del estudiante" },
+        "studentName": { "type": "string", "description": "Nombre completo del estudiante" },
+        "courseCode": { "type": "string", "description": "Código del curso (ej. 6A)" },
+        "teacherUid": { "type": "string", "description": "UID del docente emisor" },
+        "teacherName": { "type": "string", "description": "Nombre del docente" },
+        "level": { "type": "string", "enum": ["1", "2", "3", "4"], "description": "Nivel de severidad institucional" },
+        "category": { "type": "string", "description": "disciplina, academico, asistencia, etc." },
+        "title": { "type": "string", "description": "Motivo del registro" },
+        "description": { "type": "string", "description": "Detalle de los hechos" },
+        "date": { "type": "string", "description": "Fecha" },
+        "status": { "type": "string", "description": "registrado, notificado, atendido o cerrado" }
+      },
+      "required": ["studentId", "studentName", "teacherUid", "title", "description"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Perfiles de usuarios del sistema SIGAE"
+    },
+    "/teachers/{teacherId}": {
+      "schema": "TeacherProfile",
+      "description": "Registro y asignación de profesores gestionados por el Director"
+    },
+    "/groups/{groupId}": {
+      "schema": "SchoolGroup",
+      "description": "Aulas, cursos y paralelos administrados por el Director"
+    },
+    "/messages/{messageId}": {
+      "schema": "InternalMessage",
+      "description": "Sistema de comunicados y mensajería oficial de Dirección"
+    },
+    "/schools/{schoolId}": {
+      "schema": "SchoolConfig",
+      "description": "Datos institucionales de la Unidad Educativa"
+    },
+    "/grades/{courseId}": {
+      "schema": "CourseGradebook",
+      "description": "Libretas y registros de calificaciones trimestrales por materia"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "NotificationItem",
+      "description": "Notificaciones oficiales con código de color institucional"
+    },
+    "/kardex_records/{kardexId}": {
+      "schema": "KardexEntry",
+      "description": "Registros de Kárdex y seguimiento de convivencia escolar"
+    }
+  }
+}

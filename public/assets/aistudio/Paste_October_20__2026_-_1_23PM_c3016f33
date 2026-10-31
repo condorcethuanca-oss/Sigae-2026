@@ -1,0 +1,1367 @@
+# SIGAE — RECONSTRUCCIÓN FUNCIONAL COMPLETA DE LOS PANELES DOCENTE Y FAMILIAR
+
+## 1. OBJETIVO DE ESTA IMPLEMENTACIÓN
+
+Actúa como arquitecto de software, diseñador UX/UI, desarrollador full-stack sénior y especialista en React, TypeScript, Firebase Authentication, Cloud Firestore, Firebase Admin SDK, control de acceso y aplicaciones de gestión educativa.
+
+Estoy desarrollando **SIGAE — Sistema Integral de Gestión Académica Escolar**, para la **U.E. Luis Espinal Tarde de Collpani**, Bolivia, código SIE **80730142**.
+
+Quiero corregir el proyecto existente, no reconstruirlo desde cero.
+
+La aplicación debe parecerse al diseño que ya hemos desarrollado: interfaz oscura en los paneles internos, menú lateral, tarjetas modernas, acentos violetas y azul institucional, textos legibles y navegación adaptable a computadora y celular.
+
+Sin embargo, ahora la prioridad es **que todas las funciones trabajen realmente con Firebase y respeten las reglas académicas del colegio**.
+
+No quiero datos ficticios, estadísticas inventadas, botones decorativos ni pantallas que simplemente aparenten funcionar.
+
+Debes inspeccionar los archivos actuales antes de modificarlos, especialmente:
+
+- `src/components/AuthScreen.tsx`
+- `src/firebase/authService.ts`
+- `src/firebase/studentService.ts`
+- `src/firebase/scheduleService.ts`
+- `src/components/panels/ProfesorDashboard.tsx`
+- `src/components/panels/AreaAcademicaView.tsx`
+- Los componentes del panel familiar y del panel de Dirección.
+- `src/types.ts`
+- Las reglas actuales de Firestore.
+- Los servicios de autenticación, asistencia, mensajes, calificaciones y notificaciones.
+- El backend existente, si está implementado.
+- Las colecciones reales de Firestore.
+
+No supongas que estos archivos contienen las funciones correctas solo porque aparecieron en tu último informe.
+
+---
+
+# PARTE I — ARQUITECTURA GENERAL DE SIGAE
+
+## 2. LOS CUATRO ROLES
+
+Los roles oficiales son:
+
+- `director`
+- `profesor`
+- `padre`
+- `alumno`
+
+No crees el rol `superadmin`.
+
+Cada cuenta tendrá un UID de Firebase Authentication y un perfil institucional asociado.
+
+### Director
+
+Tiene las funciones administrativas autorizadas de la institución.
+
+### Profesor
+
+Puede gestionar únicamente sus asignaciones académicas reales y consultar la información necesaria para su trabajo.
+
+### Padre
+
+Puede consultar la información académica de sus hijos, siempre que exista una vinculación familiar verificada.
+
+### Alumno
+
+Tiene acceso únicamente a su información académica autorizada.
+
+No reutilices el mismo panel para todos cambiando solamente el título. Cada rol debe tener sus propias rutas, componentes, funciones, permisos y consultas.
+
+## 3. FLUJO GENERAL DE LA APLICACIÓN
+
+El flujo será:
+
+Pantalla inicial
+→ Iniciar sesión o registrarse
+→ Firebase Authentication
+→ Obtener UID e ID token
+→ Verificar identidad
+→ Buscar perfil institucional
+→ Comprobar rol y estado
+→ Abrir el panel correspondiente.
+
+### Resultado según la cuenta
+
+| Rol y estado | Destino |
+|---|---|
+| Director autorizado | Panel de Dirección |
+| Profesor pendiente | Pantalla de revisión |
+| Profesor aprobado | Panel del Profesor |
+| Profesor rechazado | Pantalla de estado |
+| Padre autenticado sin hijos vinculados | Portal familiar con solicitudes y opción de vinculación |
+| Padre con hijos vinculados | Panel Familiar |
+| Alumno autorizado | Panel del Alumno |
+| Perfil incompleto | Recuperación segura de registro |
+| Cuenta suspendida | Pantalla de acceso restringido |
+
+No debe existir ninguna redirección automática al panel de Dirección para profesores o padres.
+
+### Sesiones
+
+La aplicación debe:
+
+1. Recuperar correctamente la sesión al recargar.
+2. Consultar el perfil del UID autenticado.
+3. Revalidar los permisos en operaciones protegidas.
+4. Reflejar cambios de autorización sin mezclar sesiones.
+5. Cerrar sesión correctamente.
+6. Impedir acceder mediante la URL a paneles ajenos.
+
+La sesión de la directora y la del profesor son identidades independientes.
+
+---
+
+# PARTE II — PANEL COMPLETO DEL PROFESOR
+
+## 4. DISEÑO PRINCIPAL DEL PANEL DOCENTE
+
+Mantén la estética de la captura proporcionada, pero corrige su contenido.
+
+Encabezado:
+
+**Portal Docente — SIGAE**
+
+Debajo debe aparecer:
+
+- Nombre real del profesor.
+- Área o especialidad institucional.
+- Estado de autorización.
+- Gestión académica.
+- Accesos rápidos a las tareas docentes.
+
+No muestres un identificador de expediente inventado, horas trabajadas ficticias o cantidades de estudiantes no comprobadas.
+
+El texto «Resumen general y métricas institucionales» no corresponde al profesor. Sustitúyelo por «Resumen de mis actividades docentes».
+
+### Menú lateral del profesor
+
+Debe contener:
+
+1. Inicio / Resumen.
+2. Mis clases de hoy.
+3. Mis cursos y materias.
+4. Listas de estudiantes.
+5. Mi horario.
+6. Asistencia.
+7. Calificaciones.
+8. Comunicados.
+9. Mensajería interna.
+10. Notificaciones.
+11. Mi perfil.
+12. Cerrar sesión.
+
+Las pantallas se pueden agrupar visualmente, pero todas estas funciones deben tener una ruta y comportamiento definido.
+
+## 5. BOTÓN «INICIO / RESUMEN»
+
+### Qué mostrará
+
+Al entrar, el profesor verá:
+
+- Su nombre real.
+- Materias asignadas.
+- Cursos y paralelos asignados.
+- Clases correspondientes al día actual.
+- Próximos bloques de su horario.
+- Asistencias pendientes de registrar.
+- Comunicados y mensajes recibidos.
+- Accesos rápidos para abrir una clase.
+
+Todos los valores deben proceder de Firestore.
+
+### Cómo funciona
+
+El backend identifica el UID del profesor.
+
+Después consulta sus asignaciones oficiales de la gestión activa.
+
+A partir de esas asignaciones, busca el horario y los cursos correspondientes.
+
+Si el profesor no tiene asignaciones, muestra:
+
+«Tu cuenta está autorizada, pero la Dirección todavía no te ha asignado cursos o materias».
+
+No muestres cursos ficticios para llenar el panel.
+
+## 6. BOTÓN «MIS CLASES DE HOY»
+
+Esta es una función importante para el trabajo diario del profesor.
+
+### Qué muestra
+
+Una lista de clases correspondientes al día seleccionado:
+
+- Materia.
+- Curso y paralelo.
+- Turno.
+- Hora de inicio y final.
+- Estado de la clase.
+- Acceso a estudiantes.
+- Acceso al registro de asistencia.
+
+Ejemplo visual del formato:
+
+**Matemáticas — 6.º A**
+- Turno: mañana.
+- Horario: obtenido de Firestore.
+- Botón: «Abrir clase».
+
+No inventes materias u horarios para completar la vista.
+
+### Al presionar «Abrir clase»
+
+Debe abrirse el espacio académico de esa clase con:
+
+- Materia.
+- Curso.
+- Lista de estudiantes.
+- Fecha.
+- Horario.
+- Opciones autorizadas de asistencia y calificaciones.
+
+### Botón «Registrar asistencia»
+
+Abre la lista de alumnos correspondientes a esa clase.
+
+### Botón «Ver estudiantes»
+
+Muestra únicamente la nómina autorizada de ese curso.
+
+### Botón «Volver»
+
+Regresa a la vista de clases del profesor conservando la fecha seleccionada.
+
+## 7. BOTÓN «MIS CURSOS Y MATERIAS»
+
+Este apartado muestra todas las asignaciones del profesor.
+
+La Dirección es responsable de establecer las asignaciones oficiales.
+
+Cada tarjeta debe mostrar:
+
+- Nombre de la materia.
+- Grado.
+- Paralelo.
+- Turno.
+- Cantidad real de estudiantes matriculados.
+- Estado de la asignación.
+
+### Al pulsar una tarjeta
+
+Se abre la página del curso seleccionado.
+
+Dentro de ella debe existir:
+
+- «Ver estudiantes».
+- «Ver horario».
+- «Registrar asistencia».
+- «Consultar asistencia».
+- «Calificaciones», cuando el módulo esté habilitado.
+- «Volver a mis cursos».
+
+El profesor no puede entrar a un curso no asignado modificando la URL.
+
+### Asignación de curso
+
+No permitas que el profesor se asigne materias o paralelos libremente.
+
+La Dirección debe confirmar la relación entre docente, materia, curso y gestión académica.
+
+Cada curso y paralelo tendrá un identificador institucional propio.
+
+También podrá tener un código de grupo o QR para solicitudes autorizadas de acceso, pero ese código no concede permisos académicos automáticamente.
+
+## 8. BOTÓN «LISTAS DE ESTUDIANTES»
+
+El profesor seleccionará uno de sus cursos asignados.
+
+El sistema obtendrá desde Firestore la lista oficial de estudiantes matriculados.
+
+Debe mostrar:
+
+- Nombre completo.
+- Número de lista, cuando exista oficialmente.
+- Curso y paralelo.
+- Estado de matrícula.
+- Acceso a información académica necesaria para sus funciones.
+
+No expongas RUDE, CI u otros datos sensibles en vistas generales cuando no sean necesarios.
+
+### Funciones
+
+**Buscar estudiante:** filtra la nómina del curso autorizado.
+
+**Ver ficha:** muestra únicamente información que el docente tiene permiso para consultar.
+
+**Ir a asistencia:** abre el registro del curso y fecha.
+
+**Ir a calificaciones:** abre las evaluaciones autorizadas de su materia.
+
+**Actualizar lista:** vuelve a consultar los registros vigentes de Firestore.
+
+No permitas eliminar estudiantes del padrón institucional desde esta lista.
+
+Las modificaciones de matrícula corresponden al procedimiento administrativo de la institución.
+
+## 9. BOTÓN «MI HORARIO»
+
+Debe mostrar las asignaciones reales del profesor.
+
+Vista semanal:
+
+- Lunes.
+- Martes.
+- Miércoles.
+- Jueves.
+- Viernes.
+- Sábado, cuando corresponda.
+
+Distingue:
+
+- Turno de mañana.
+- Turno de tarde.
+- Materia.
+- Curso.
+- Paralelo.
+- Hora inicial y final.
+- Recreo.
+
+### Funcionamiento
+
+El backend obtiene el UID autenticado.
+
+Después consulta `teachingAssignments` y los horarios vigentes relacionados.
+
+No utilices un horario fijo para todos los profesores.
+
+Cuando la Dirección modifica una asignación autorizada, el horario docente debe reflejar el cambio.
+
+Conserva el historial académico correspondiente a las clases anteriores.
+
+### Botones
+
+**Día anterior / Día siguiente:** cambian el día visible.
+
+**Ver semana completa:** muestra todas las asignaciones.
+
+**Abrir clase:** lleva al espacio académico de esa asignación.
+
+**Actualizar horario:** recupera la versión vigente desde Firestore.
+
+## 10. BOTÓN «ASISTENCIA»
+
+Esta función debe implementarse con especial cuidado.
+
+### Paso 1: seleccionar la clase
+
+El profesor selecciona:
+
+- Curso.
+- Materia asignada.
+- Fecha.
+- Período o bloque, cuando corresponda.
+
+No debe poder seleccionar cursos ajenos.
+
+### Paso 2: cargar estudiantes
+
+El sistema consulta la matrícula oficial del curso.
+
+Para cada estudiante aparece un selector de estado:
+
+- Presente.
+- Ausente.
+- Tardanza.
+- Licencia o falta justificada.
+- Pendiente de registro.
+
+La categoría «Pendiente» significa que todavía no hay información, no que el estudiante faltó.
+
+### Paso 3: registrar asistencia
+
+El profesor establece el estado de cada estudiante.
+
+Debe haber un botón:
+
+**Guardar asistencia**
+
+Al pulsarlo:
+
+1. Validar que el docente esté asignado a la clase.
+2. Confirmar el curso y fecha.
+3. Validar los estados.
+4. Guardar la sesión en Firestore.
+5. Registrar UID del docente y fecha de modificación.
+6. Mostrar confirmación real de guardado.
+7. Recuperar y mostrar los datos guardados.
+
+No muestres éxito antes de confirmar la escritura.
+
+### Botón «Editar asistencia»
+
+Debe permitir corregir registros únicamente cuando esté autorizado por las reglas institucionales.
+
+Guarda un historial de cambios importantes.
+
+### Botón «Historial»
+
+Muestra las fechas con registros existentes.
+
+### Botón «Ver resumen»
+
+Calcula los totales a partir de los registros reales.
+
+No muestres 100 % de asistencia cuando no hay ningún registro.
+
+### Seguridad
+
+El padre solamente podrá consultar la asistencia de sus hijos vinculados.
+
+El profesor solo podrá modificar la asistencia correspondiente a sus asignaciones.
+
+La Dirección podrá consultar los registros institucionales y realizar las correcciones administrativas autorizadas.
+
+## 11. BOTÓN «CALIFICACIONES»
+
+Debe funcionar por materia, curso y período académico.
+
+No inventes escalas, fórmulas de promedio ni ponderaciones. Deben configurarse según el sistema de evaluación que utilice realmente la institución.
+
+### Pantalla principal
+
+El profesor selecciona:
+
+- Curso.
+- Materia.
+- Período académico.
+- Evaluación o actividad.
+
+### Botón «Crear evaluación»
+
+Solicita:
+
+- Nombre de la evaluación.
+- Materia.
+- Curso.
+- Fecha.
+- Valor o escala autorizada.
+- Ponderación, si corresponde al sistema institucional.
+
+### Botón «Registrar notas»
+
+Muestra los estudiantes del curso y permite introducir las calificaciones.
+
+### Botón «Guardar borrador»
+
+Guarda los datos sin publicarlos para estudiantes y padres.
+
+### Botón «Publicar calificaciones»
+
+Solamente permite publicar cuando las notas cumplen las validaciones y el profesor tiene permiso.
+
+Si la institución exige revisión de Dirección, respeta ese procedimiento.
+
+### Botón «Editar calificaciones»
+
+Permite modificaciones autorizadas y registra los cambios importantes.
+
+### Botón «Ver resumen»
+
+Muestra resultados calculados exclusivamente a partir de calificaciones existentes.
+
+El padre solamente puede ver las notas oficialmente publicadas de sus hijos.
+
+Si la función todavía no está terminada, muestra claramente su estado sin fabricar boletas de notas.
+
+## 12. BOTÓN «COMUNICADOS»
+
+Debe mostrar anuncios institucionales relacionados con el profesor.
+
+### Funciones
+
+**Ver comunicado:** abre el contenido completo.
+
+**Marcar como leído:** guarda el estado de lectura.
+
+**Crear comunicado para mis cursos:** disponible únicamente si la Dirección autorizó a los profesores a publicar comunicados de sus grupos.
+
+**Publicar:** guarda el comunicado con destinatarios definidos.
+
+El profesor no puede enviar un comunicado institucional general si no tiene permisos.
+
+## 13. BOTÓN «MENSAJERÍA INTERNA»
+
+No implementes llamadas de voz ni videollamadas.
+
+Será mensajería de texto interna, con permisos.
+
+### Funciones
+
+**Nueva conversación:** permite elegir un destinatario autorizado.
+
+**Abrir conversación:** carga los mensajes existentes.
+
+**Enviar mensaje:** guarda el texto con autor, destinatario y fecha.
+
+**Marcar leído:** registra el estado correspondiente.
+
+**Buscar conversación:** filtra las conversaciones permitidas.
+
+### Seguridad
+
+El profesor podrá comunicarse con los padres o responsables que estén vinculados a estudiantes de sus cursos, cuando las reglas institucionales permitan esa comunicación.
+
+No podrá buscar arbitrariamente cualquier usuario del sistema ni consultar conversaciones ajenas.
+
+La directora podrá supervisar o intervenir únicamente según las políticas y permisos definidos.
+
+## 14. BOTÓN «MI PERFIL»
+
+Debe mostrar:
+
+- Nombre oficial.
+- Correo electrónico.
+- Teléfono.
+- Área o especialidad.
+- Estado de aprobación.
+- Cursos y materias asignados.
+- Gestión escolar.
+
+### Botón «Editar mis datos»
+
+Permite modificar únicamente datos personales autorizados, como teléfono y otros campos permitidos.
+
+No debe permitir modificar:
+
+- Rol.
+- Estado de aprobación.
+- CI oficial sin un procedimiento de revisión.
+- Asignaciones docentes.
+- Permisos administrativos.
+
+### Botón «Cambiar contraseña»
+
+Utiliza los procedimientos oficiales de Firebase Authentication.
+
+No guardes contraseñas en Firestore.
+
+### Botón «Cerrar sesión»
+
+Cierra la sesión mediante Firebase Authentication y limpia los estados locales privados.
+
+---
+
+# PARTE III — PANEL COMPLETO DEL PADRE O TUTOR
+
+## 15. DISEÑO DEL PANEL FAMILIAR
+
+Quiero que el panel familiar sea claramente diferente del panel del profesor.
+
+La captura anterior mostraba un panel con algunas tarjetas, pero faltaban las funciones principales.
+
+El encabezado debe decir:
+
+**Portal de la Familia — SIGAE**
+
+Debajo:
+
+«Seguimiento académico de tus hijos».
+
+No utilices «Resumen general y métricas institucionales», porque eso corresponde a Dirección.
+
+### Menú lateral
+
+1. Inicio / Resumen.
+2. Mis hijos.
+3. Horario escolar.
+4. Asistencia.
+5. Calificaciones / Boleta de notas.
+6. Comunicados.
+7. Mensajería interna.
+8. Vincular otro hijo.
+9. Notificaciones.
+10. Mi perfil.
+11. Cerrar sesión.
+
+Cada botón debe tener una acción verdadera, no limitarse a mostrar una tarjeta decorativa.
+
+## 16. BOTÓN «INICIO / RESUMEN»
+
+Cuando un padre entra, el sistema obtiene su UID y consulta sus vinculaciones familiares verificadas.
+
+La pantalla debe mostrar:
+
+- Nombre del adulto autenticado.
+- Hijos vinculados.
+- Curso y paralelo de cada hijo.
+- Asistencia real disponible.
+- Comunicados escolares.
+- Próximos eventos oficiales.
+- Acceso al horario de cada hijo.
+
+### Si todavía no hay hijos autorizados
+
+Mostrar:
+
+«Todavía no tienes estudiantes vinculados a tu cuenta. Puedes solicitar la vinculación de tu hijo o consultar el estado de una solicitud pendiente».
+
+Botones:
+
+- «Vincular a mi hijo».
+- «Ver solicitudes».
+
+No inventes estudiantes para rellenar el panel.
+
+### Si hay varios hijos
+
+Mostrar un selector de estudiante.
+
+Al seleccionar otro hijo, todos los módulos deben cargar los datos correspondientes al estudiante seleccionado.
+
+No mezcles sus horarios, asistencia, calificaciones ni docentes.
+
+## 17. BOTÓN «MIS HIJOS»
+
+Muestra exclusivamente los estudiantes con vínculo familiar verificado.
+
+Cada tarjeta tendrá:
+
+- Nombre oficial del estudiante.
+- Curso.
+- Paralelo.
+- Gestión.
+- Estado de matrícula.
+- Acceso a funciones académicas autorizadas.
+
+### Botón «Ver información»
+
+Abre el resumen académico del hijo.
+
+### Botón «Ver horario»
+
+Consulta el horario oficial del curso del estudiante.
+
+### Botón «Ver asistencia»
+
+Abre su registro de asistencia.
+
+### Botón «Ver calificaciones»
+
+Abre sus notas publicadas, si existen.
+
+### Botón «Vincular otro hijo»
+
+Inicia una nueva solicitud de vinculación.
+
+No necesita registrar otra cuenta de padre.
+
+No muestres el RUDE completo en tarjetas públicas o en el panel principal si no es necesario.
+
+## 18. BOTÓN «VINCULAR OTRO HIJO»
+
+Implementa el flujo de tres pasos que ya acordamos.
+
+### Paso 1 — Datos del adulto
+
+Si la cuenta ya está registrada, recupera los datos del padre desde su perfil.
+
+No le pidas nuevamente correo y contraseña.
+
+Permite confirmar la identidad con el mecanismo de seguridad necesario.
+
+### Paso 2 — Datos del hijo
+
+Campos:
+
+- Nombre del estudiante.
+- RUDE.
+- CI.
+- Curso y paralelo para confirmar el expediente institucional, cuando corresponda.
+
+El backend compara los identificadores con el padrón oficial.
+
+No permite búsquedas públicas masivas por RUDE.
+
+### Paso 3 — Autorización
+
+El padre elige uno de los métodos acordados.
+
+**A. Aprobación de la directora**
+
+Se registra una solicitud pendiente.
+
+La directora verifica el parentesco y aprueba o rechaza.
+
+**B. Código individual seguro**
+
+La institución emite un código después de verificar la relación.
+
+El código debe ser:
+
+- Individual.
+- Temporal.
+- De un solo uso.
+- Generado de forma segura.
+- Protegido en el backend.
+- Limitado por número de intentos.
+- Relacionado con una solicitud o vinculación autorizada.
+
+No se debe guardar un código reutilizable en texto plano.
+
+### Botón «Enviar solicitud»
+
+Crea la solicitud en Firestore con estado pendiente.
+
+### Botón «Validar código»
+
+Envía el código al backend para su verificación segura.
+
+### Botón «Consultar estado»
+
+Muestra si la vinculación está pendiente, aprobada o rechazada.
+
+### Después de aprobar
+
+El estudiante aparece en «Mis hijos».
+
+La relación permanece guardada para los siguientes inicios de sesión.
+
+No concedas acceso a los datos privados únicamente porque el RUDE y el CI coinciden.
+
+## 19. CÓDIGOS DE CURSO Y QR
+
+Habíamos definido que cada curso y paralelo puede tener un código propio.
+
+Por ejemplo, 6.º A tendrá su identificador de curso y un código de acceso asociado, pero ese código no es la contraseña del estudiante ni autoriza acceso a datos privados.
+
+### Función del código de curso
+
+- Identificar un curso o grupo.
+- Facilitar solicitudes de incorporación autorizadas.
+- Reducir errores al escribir el curso.
+- Permitir enlaces o códigos QR institucionales.
+
+### Diferencia con el código familiar
+
+El código familiar es individual y solo puede utilizarse para una vinculación verificada.
+
+El código de curso identifica un grupo.
+
+No son intercambiables.
+
+### Función del QR
+
+El QR podrá contener una referencia a una solicitud de acceso o al curso.
+
+No debe contener información sensible de estudiantes.
+
+Escanearlo no registra asistencia ni concede acceso automático a expedientes privados.
+
+Las solicitudes de incorporación a un grupo seguirán los permisos definidos por Dirección. El profesor podrá revisarlas únicamente si la institución le delegó esa facultad.
+
+## 20. BOTÓN «HORARIO ESCOLAR»
+
+Esta función es una de las más importantes.
+
+### Funcionamiento
+
+1. El padre selecciona a su hijo.
+2. El backend comprueba que esté vinculado.
+3. Consulta su matrícula de la gestión activa.
+4. Obtiene el `courseId`.
+5. Consulta el horario de ese curso.
+6. Muestra las clases semanales.
+
+No escribas el horario dentro del componente como datos fijos.
+
+### Vista del horario
+
+Debe incluir:
+
+- Nombre del estudiante.
+- Grado y paralelo.
+- Gestión.
+- Semana y días.
+- Turno de mañana.
+- Turno de tarde.
+- Materias en orden.
+- Horas iniciales y finales verificadas.
+- Recreo.
+- Días sin clases.
+- Profesor asignado, cuando esté confirmado.
+
+### Horario proporcionado para 6.º A
+
+Mañana: 08:00 a 12:15.
+
+Tarde: 14:00 a 18:15.
+
+Recreo informado: 10:45 a 11:00.
+
+Períodos habituales de 80 minutos, con algunos de 40 minutos.
+
+**Lunes**
+- Mañana: Biología, Música, Matemáticas.
+- Tarde: Informática.
+
+**Martes**
+- Mañana: Artes Plásticas, Lenguaje (40 minutos), Matemáticas (40 minutos), Ciencias Sociales.
+- Tarde: sin clases.
+
+**Miércoles**
+- Mañana: Lenguaje, Ciencias Sociales, Psicología.
+- Tarde: Informática.
+
+**Jueves**
+- Mañana: Química, Ciencias Sociales, Matemáticas.
+- Tarde: Inglés, Biología, Educación Física.
+
+**Viernes**
+- Mañana: Física, Ciencias Sociales, Religión.
+- Tarde: todavía no confirmada.
+
+No se ha proporcionado un horario confirmado del sábado para 6.º A.
+
+No inventes las horas exactas de inicio y final de cada materia.
+
+Debes consultar el archivo institucional `HORARIO REDUCIDO 2024.xlsx` y las imágenes correspondientes antes de reconstruir el horario definitivo.
+
+Si no tienes ese documento, solicítalo en lugar de inventar asignaciones.
+
+### Botones de horario
+
+**Día anterior / Día siguiente:** cambia el día visible.
+
+**Ver semana completa:** muestra todos los días.
+
+**Turno mañana / tarde:** filtra los bloques.
+
+**Ver materia:** abre información académica autorizada de esa materia.
+
+**Actualizar:** recupera la información vigente de Firestore.
+
+Si la Dirección modifica oficialmente un horario, ese cambio debe reflejarse en el panel familiar.
+
+## 21. BOTÓN «ASISTENCIA»
+
+Debe mostrar la asistencia real de cada hijo.
+
+### Vista principal
+
+- Nombre del estudiante.
+- Curso y paralelo.
+- Fecha seleccionada.
+- Materias o clases del día, cuando corresponda.
+- Estado registrado.
+- Historial de días anteriores.
+
+Estados que pueden aparecer:
+
+- Presente.
+- Ausente.
+- Tardanza.
+- Licencia justificada.
+- Pendiente de registro.
+
+No conviertas los registros pendientes en ausencias.
+
+### Botón «Ver día»
+
+Muestra las clases y estados correspondientes a una fecha.
+
+### Botón «Ver historial»
+
+Muestra las fechas anteriores.
+
+### Botón «Ver resumen»
+
+Calcula el resultado a partir de los registros oficiales existentes.
+
+No muestres porcentajes como 100 % si no hay información suficiente.
+
+### Botón «Solicitar revisión»
+
+Permite enviar una solicitud o consulta al profesor o a la Dirección según el procedimiento institucional.
+
+No cambia automáticamente la asistencia.
+
+### Licencias
+
+Si la institución habilita la presentación de justificativos, el padre podrá solicitar una revisión o adjuntar documentación mediante un mecanismo seguro y autorizado.
+
+La aprobación y actualización oficial dependerá del personal correspondiente.
+
+## 22. BOTÓN «CALIFICACIONES / BOLETA DE NOTAS»
+
+El padre debe poder consultar las calificaciones oficiales publicadas de sus hijos.
+
+### Vista
+
+- Hijo seleccionado.
+- Curso.
+- Materias.
+- Período o trimestre.
+- Calificaciones publicadas.
+- Estado de publicación.
+
+### Botón «Seleccionar trimestre»
+
+Cambia el período académico.
+
+### Botón «Ver materia»
+
+Muestra el detalle autorizado de evaluaciones y calificaciones.
+
+### Botón «Ver boleta»
+
+Abre la boleta académica únicamente si ha sido generada y publicada oficialmente.
+
+### Botón «Descargar boleta»
+
+Solo debe aparecer cuando exista un documento real y esté permitido descargarlo.
+
+No generes una boleta ficticia.
+
+No inventes promedios ni escalas académicas.
+
+Si todavía no hay notas publicadas, muestra:
+
+«Aún no existen calificaciones publicadas para este período».
+
+El padre no podrá editar las calificaciones.
+
+## 23. BOTÓN «COMUNICADOS»
+
+Debe mostrar:
+
+- Avisos generales de Dirección.
+- Comunicados dirigidos al curso del hijo.
+- Avisos de profesores autorizados.
+- Actividades del calendario escolar.
+
+### Botón «Abrir comunicado»
+
+Muestra el contenido completo.
+
+### Botón «Marcar leído»
+
+Guarda el estado de lectura.
+
+### Botón «Ver evento»
+
+Abre la información del evento correspondiente.
+
+No muestres eventos inventados.
+
+## 24. BOTÓN «MENSAJERÍA INTERNA»
+
+Permite al padre comunicarse con profesores y responsables autorizados.
+
+### Pantalla
+
+Mostrar:
+
+- Conversaciones existentes.
+- Profesores relacionados con sus hijos.
+- Nombre del curso o materia correspondiente.
+- Mensajes recibidos.
+- Estado de lectura.
+
+### Botón «Contactar profesor»
+
+Solo debe ofrecer profesores efectivamente asignados a las materias o cursos del hijo seleccionado, según los permisos institucionales.
+
+### Botón «Enviar mensaje»
+
+Guarda el mensaje con:
+
+- Autor.
+- Destinatario.
+- Conversación.
+- Fecha.
+- Estado.
+
+### Botón «Abrir conversación»
+
+Recupera los mensajes anteriores.
+
+### Botón «Marcar leído»
+
+Actualiza el estado de lectura.
+
+No implementes llamadas de voz o videollamadas.
+
+No permitas mensajes a usuarios arbitrarios ni leer conversaciones de otras familias.
+
+Si no existe un tutor de curso oficialmente asignado, no inventes uno para habilitar el botón «Contactar al Tutor».
+
+## 25. BOTÓN «MI PERFIL»
+
+Debe mostrar los datos del adulto:
+
+- Nombre.
+- Correo.
+- Teléfono.
+- Cédula de identidad, con presentación y permisos apropiados.
+- Estado de la cuenta.
+- Hijos vinculados.
+
+### Botón «Editar»
+
+Permite modificar los campos personales autorizados.
+
+### Botón «Cambiar contraseña»
+
+Usa Firebase Authentication y la reautenticación que corresponda.
+
+### Botón «Gestionar mis hijos»
+
+Abre las vinculaciones existentes y sus estados.
+
+No permite aprobar manualmente relaciones pendientes.
+
+### Botón «Cerrar sesión»
+
+Cierra la sesión mediante Firebase Authentication y evita que la siguiente persona vea datos privados de la familia.
+
+---
+
+# PARTE IV — FIREBASE Y BACKEND
+
+## 26. PRINCIPIO GENERAL
+
+El backend es responsable de verificar identidad, permisos y relaciones antes de realizar operaciones sensibles.
+
+Firebase Authentication administra la identidad.
+
+Firestore conserva perfiles, expedientes institucionales, cursos, horarios, asistencias y relaciones.
+
+El frontend presenta la información que el usuario tiene permiso para consultar.
+
+No almacenes contraseñas en Firestore, archivos locales, logs ni colecciones institucionales.
+
+Si existe un backend Express/Node.js, utiliza Firebase Admin SDK para verificar los ID tokens.
+
+No implementes JWT propios adicionales si Firebase Authentication ya cubre la necesidad.
+
+Si una operación debe ejecutarse con privilegios administrativos, hazlo desde un entorno de servidor autorizado, nunca desde el navegador con credenciales de servicio.
+
+Antes de implementar estas funciones, comprueba la infraestructura realmente disponible y las restricciones del plan de Firebase. No asumas que existen Cloud Functions o Firebase Admin SDK configurados si el proyecto no los tiene.
+
+## 27. MODELO DE DATOS
+
+Primero inspecciona las colecciones reales del proyecto.
+
+Los informes anteriores utilizaron rutas diferentes, como:
+
+- `/users/{uid}`
+- `/teachers`
+- `/colegios/luis-espinal-collpani/usuarios/{uid}`
+- `/parentStudentLinkRequests`
+- `/access_requests`
+- `/attendance_sessions`
+
+Debes identificar la fuente de datos vigente y evitar crear colecciones duplicadas.
+
+El modelo conceptual debe contemplar:
+
+### Identidad y perfiles
+
+- `users`
+- `teachers`
+- `parents`
+- `students`
+
+### Gestión académica
+
+- `courses`
+- `enrollments`
+- `subjects`
+- `teachingAssignments`
+- `schedules`
+
+### Vinculaciones
+
+- `parentStudentLinkRequests`
+- `parentStudentLinks`
+- `familyLinkInvitations`
+- `courseJoinRequests`, cuando corresponda.
+
+### Funciones escolares
+
+- `attendance_sessions`
+- `attendance_records`
+- `assessments`
+- `grades`
+- `announcements`
+- `schoolCalendar`
+- `conversations`
+- `messages`
+- `notifications`
+- `auditLogs`
+
+Estos nombres son una propuesta conceptual. No dupliques las colecciones existentes si el proyecto ya tiene equivalentes válidos.
+
+Cada documento debe tener identificadores estables, relaciones claras y permisos apropiados.
+
+### Relaciones principales
+
+- Un usuario tiene un UID de Authentication.
+- Un profesor se relaciona con sus asignaciones mediante su UID institucional.
+- Una asignación relaciona profesor, materia, curso y gestión.
+- Un estudiante pertenece a un curso mediante una matrícula.
+- Un padre se relaciona con uno o varios estudiantes mediante vínculos verificados.
+- El horario pertenece a un curso, materia, turno y gestión.
+- La asistencia pertenece a una clase, fecha y estudiante.
+- Las calificaciones pertenecen a una evaluación, materia y estudiante.
+- Las conversaciones pertenecen únicamente a participantes autorizados.
+
+## 28. FUNCIONES DEL BACKEND
+
+Debe poder:
+
+1. Verificar el Firebase ID token.
+2. Obtener el UID real.
+3. Recuperar el perfil institucional.
+4. Comprobar rol y estado.
+5. Consultar asignaciones docentes.
+6. Consultar listas autorizadas.
+7. Registrar asistencia.
+8. Crear y consultar evaluaciones autorizadas.
+9. Consultar vínculos familiares.
+10. Verificar solicitudes familiares.
+11. Validar y consumir códigos individuales.
+12. Consultar horarios oficiales.
+13. Consultar calificaciones publicadas.
+14. Gestionar notificaciones y mensajes.
+15. Registrar acciones administrativas importantes.
+
+No confíes en valores manipulables del navegador para decidir permisos.
+
+### Protección contra errores
+
+- No escribas campos `undefined` en Firestore.
+- Valida los campos obligatorios.
+- Utiliza marcas de tiempo consistentes.
+- Evita escrituras duplicadas.
+- Aplica transacciones cuando corresponda.
+- No muestres éxito si la escritura falló.
+- Implementa recuperación segura de perfiles incompletos.
+- Maneja errores de correo duplicado.
+- Maneja credenciales inválidas.
+- Maneja errores de permisos.
+- No expongas datos sensibles en mensajes técnicos.
+
+## 29. INICIO DE SESIÓN
+
+Corrige el problema actual de las cuentas registradas con correo y contraseña.
+
+Cuando un usuario se registra mediante ese proveedor, debe poder iniciar sesión con las mismas credenciales.
+
+Si una cuenta utiliza exclusivamente Google, el sistema debe respetar ese proveedor y no fingir que tiene una contraseña habilitada.
+
+No inventes contraseñas ni modifiques proveedores de cuentas reales sin autorización.
+
+Después de autenticar, SIGAE debe consultar el perfil y dirigirse al panel correcto.
+
+## 30. DIRECTORA Y PERMISOS INSTITUCIONALES
+
+La Dirección es responsable de:
+
+- Aprobar o rechazar profesores.
+- Administrar expedientes docentes.
+- Asignar cursos y materias.
+- Administrar cursos y paralelos.
+- Gestionar el padrón estudiantil.
+- Verificar vinculaciones familiares.
+- Emitir códigos individuales autorizados.
+- Administrar horarios oficiales.
+- Consultar asistencia.
+- Gestionar el calendario escolar.
+- Publicar comunicados.
+- Consultar reportes.
+
+La aprobación de un profesor no debe cambiar la sesión de la directora.
+
+La autorización de un padre no debe crear automáticamente una matrícula nueva.
+
+Una matrícula no debe crearse automáticamente solo porque alguien escanee un QR.
+
+Los registros deben mantenerse separados por institución, gestión, curso y usuario.
+
+---
+
+# PARTE V — PRUEBAS DE FUNCIONAMIENTO
+
+## 31. PRUEBAS DEL PROFESOR
+
+Comprueba estos recorridos:
+
+1. El profesor se registra correctamente.
+2. Su solicitud aparece pendiente.
+3. No entra al panel docente antes de la aprobación.
+4. La directora aprueba.
+5. El profesor entra a su panel docente.
+6. No puede entrar al panel de Dirección.
+7. Ve únicamente sus asignaciones oficiales.
+8. Puede abrir un curso autorizado.
+9. La lista de estudiantes coincide con la matrícula real.
+10. Registra asistencia y la escritura queda confirmada en Firestore.
+11. Al recargar puede consultar la asistencia guardada.
+12. No puede modificar asistencia de cursos ajenos.
+13. Ve su horario según las asignaciones oficiales.
+14. Consulta o registra calificaciones cuando el módulo esté habilitado.
+15. No puede publicar notas sin cumplir las validaciones y permisos.
+16. Puede consultar comunicados autorizados.
+17. Solo puede enviar mensajes a destinatarios autorizados.
+18. Puede cerrar sesión sin dejar datos privados visibles.
+
+## 32. PRUEBAS DEL PADRE
+
+Comprueba:
+
+1. El adulto puede registrarse con su propio formulario.
+2. El sistema distingue los datos del adulto y del estudiante.
+3. Guarda correctamente el perfil del adulto.
+4. Permite iniciar sesión posteriormente.
+5. Puede solicitar la vinculación de un hijo.
+6. La directora puede aprobar o rechazar.
+7. Puede usar un código individual seguro cuando corresponda.
+8. Un código de curso no permite consultar expedientes privados.
+9. No puede ver información privada de un hijo pendiente de verificación.
+10. Después de aprobarse, el hijo aparece en «Mis hijos».
+11. Puede agregar un segundo hijo sin otra cuenta.
+12. Puede seleccionar entre los hijos autorizados.
+13. Consulta el horario correspondiente al curso de cada hijo.
+14. Consulta solamente asistencias reales.
+15. Consulta únicamente calificaciones publicadas.
+16. No puede editar notas ni asistencia.
+17. Consulta comunicados autorizados.
+18. Solo puede comunicarse con destinatarios permitidos.
+19. No puede consultar datos de estudiantes no vinculados.
+20. Puede cerrar sesión y volver a entrar sin perder sus vínculos.
+
+## 33. PRUEBA ESPECÍFICA DE 6.º A
+
+El expediente previamente proporcionado corresponde a Emanuel Condorcet Huanca, con un RUDE y CI comunicados por el usuario, curso 6.º A.
+
+No introduzcas estos identificadores personales en pruebas públicas, código o logs.
+
+Comprueba que el expediente institucional y la matrícula estén correctamente registrados y autorizados, sin duplicados.
+
+Cuando un padre autorizado seleccione a este estudiante y pulse «Horario escolar», debe abrirse el horario de 6.º A.
+
+Debe mostrar las materias en el orden comunicado, la separación mañana/tarde y los períodos de 40 minutos identificados.
+
+No inventes bloques horarios que todavía no han sido validados con el archivo original.
+
+## 34. PRUEBAS DE INTERFAZ
+
+En computadoras y celulares comprueba:
+
+- Menús.
+- Botones.
+- Formularios.
+- Validaciones.
+- Mensajes de error.
+- Estados de carga.
+- Confirmaciones.
+- Selección de curso.
+- Selección de hijo.
+- Navegación hacia atrás.
+- Actualización de información.
+- Persistencia al recargar.
+- Cierre de sesión.
+
+No uses botones que parezcan funcionales pero no tengan una acción implementada.
+
+---
+
+# PARTE VI — ORDEN ESTRICTO DE IMPLEMENTACIÓN
+
+## 35. SECUENCIA DE TRABAJO
+
+**Checkpoint 1 — Diagnóstico real**
+
+Inspeccionar el código existente y localizar las causas de los fallos actuales.
+
+**Checkpoint 2 — Autenticación**
+
+Corregir inicio de sesión con correo y contraseña y proveedores asociados.
+
+**Checkpoint 3 — Perfiles y roles**
+
+Verificar que cada usuario tenga el perfil institucional correcto.
+
+**Checkpoint 4 — Panel docente**
+
+Corregir navegación, menú, asignaciones y consultas.
+
+**Checkpoint 5 — Listas y horarios**
+
+Relacionar cursos, docentes, estudiantes y horarios reales.
+
+**Checkpoint 6 — Asistencia**
+
+Implementar registro, guardado, historial y consulta autorizada.
+
+**Checkpoint 7 — Calificaciones**
+
+Implementar el flujo cuando exista una escala y procedimiento de evaluación institucional confirmados.
+
+**Checkpoint 8 — Panel familiar**
+
+Corregir sus secciones, navegación y selección de hijos.
+
+**Checkpoint 9 — Vinculación familiar**
+
+Implementar aprobación de Dirección y códigos individuales seguros.
+
+**Checkpoint 10 — Horarios familiares**
+
+Consultar el horario del curso del hijo seleccionado, comenzando por 6.º A cuando se haya validado su horario oficial.
+
+**Checkpoint 11 — Comunicados y mensajería**
+
+Conectar mensajes, destinatarios y permisos reales.
+
+**Checkpoint 12 — Seguridad**
+
+Probar reglas, backend y accesos autorizados y denegados.
+
+**Checkpoint 13 — Validación integral**
+
+Ejecutar pruebas reales de todos los recorridos.
+
+No avances si el checkpoint anterior sigue fallando.
+
+No despliegues reglas ni cambios destructivos en producción sin autorización.
+
+## 36. RESULTADO QUE ESPERO DE TI
+
+No quiero que simplemente escribas:
+
+«He corregido 8 archivos y pasaron 45 pruebas».
+
+Necesito saber:
+
+- Qué error encontraste.
+- En qué archivo estaba.
+- Qué código modificaste.
+- Cómo funciona ahora.
+- Qué datos se guardan en Firebase.
+- Qué documentos se consultan.
+- Qué permisos aplica el backend.
+- Qué botones funcionan realmente.
+- Qué pruebas se ejecutaron.
+- Qué falló.
+- Qué sigue pendiente.
+
+Si no puedes comprobar Firestore, dilo expresamente.
+
+Si no tienes acceso al horario original, solicita el archivo.
+
+Si no hay asignaciones docentes oficiales, no inventes cursos.
+
+Si no hay calificaciones o asistencia, muestra un estado vacío.
+
+**Empieza inspeccionando las pantallas y servicios actuales de Profesor y Padre, y corrige primero la autenticación y la navegación. Después implementa las funciones en el orden indicado, comprobando cada una antes de continuar.**

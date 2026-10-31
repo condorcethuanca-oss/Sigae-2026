@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan arquitectónico y de implementación para la reconstrucción funcional de los paneles de Profesor y Familia en SIGAE (U.E. Luis Espinal Tarde de Collpani, SIE 80730142). Define la estructura de los 4 roles oficiales (director, profesor, padre, alumno), la navegación completa del profesor con sus 12 vistas institucionales, el panel familiar con sus 11 vistas y selector de estudiante, la carga en Firestore del horario confirmado de 6.º A y la interacción real con Firebase sin datos ficticios.",
+  "updatedAt":  "2026-10-20T17:33:35.205042726Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

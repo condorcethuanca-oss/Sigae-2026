@@ -1,0 +1,894 @@
+# SIGAE — CONFIGURACIÓN ADMINISTRATIVA, SEGURIDAD FIREBASE, DATOS REALES Y MEJORA INTEGRAL DE LA APLICACIÓN
+
+## INSTRUCCIÓN PRINCIPAL
+
+Actúa como arquitecto de software sénior, ingeniero full-stack de React y TypeScript, especialista en Firebase Authentication, Cloud Firestore, Cloud Storage, seguridad de aplicaciones escolares y diseñador profesional UX/UI.
+
+También debes evaluar cada cambio desde la perspectiva de:
+
+- La directora que administra la unidad educativa.
+- El profesor que gestiona clases, estudiantes, notas y asistencia.
+- El padre que consulta el seguimiento académico de sus hijos.
+- El estudiante que necesita acceder a su propia información.
+
+Trabaja sobre mi aplicación existente:
+
+**SIGAE — Sistema Integral de Gestión Académica Escolar**
+
+Institución: U.E. Luis Espinal Tarde de Collpani.
+
+SIE: 80730142.
+
+Gestión: 2026.
+
+La aplicación ya utiliza React, TypeScript, Firebase Authentication y Cloud Firestore, y contiene numerosos módulos que NO debes reconstruir desde cero.
+
+Quiero mejorar su funcionamiento real, su seguridad, sus datos y su interfaz.
+
+He proporcionado también:
+
+1. La guía `Google_AI_Studio_Firebase_Guide.pdf`.
+2. Imágenes antiguas que muestran ideas del cuaderno docente, el calendario, el Kárdex y el portal de padres.
+3. Informes técnicos de auditorías y correcciones anteriores.
+
+Las imágenes antiguas son referencias de diseño, no una fuente de datos escolares reales.
+
+## PARTE 1. VERIFICACIÓN DEL PROYECTO FIREBASE
+
+Antes de modificar algo, revisa la configuración efectiva de Firebase.
+
+Los informes anteriores mencionan:
+
+Proyecto: `xenodochial-cosine-2ds98`.
+
+Base de datos Firestore: `ai-studio-educolegioprivad-8d51e715-5615-43ee-b044-0495c4753a9d`.
+
+Una captura de Storage muestra un bucket con otro identificador: `gen-lang-client-0827538879.firebasestorage.app`.
+
+Estos identificadores necesitan verificación.
+
+Comprueba:
+
+- `projectId`.
+- `authDomain`.
+- `storageBucket`.
+- ID de la base de datos Firestore.
+- Aplicación Firebase inicializada.
+- Colecciones utilizadas.
+- Bucket real empleado para los archivos.
+- Reglas de Firestore desplegadas.
+- Reglas de Storage desplegadas.
+- Credenciales y permisos del backend.
+
+No afirmes que dos recursos pertenecen al mismo proyecto sin comprobarlo.
+
+No cambies reglas en un proyecto distinto.
+
+IMPORTANTE: el informe indica que se utiliza una base de datos Firestore con nombre propio. Comprueba que todas las consultas utilicen esa base de datos y no se conecten accidentalmente a `(default)`.
+
+Revisa `src/firebase/config.ts`, incluyendo `initializeFirestore` y `getFirestore`, para verificar que la instancia no se inicialice dos veces con configuraciones incompatibles.
+
+## PARTE 2. CUENTA ADMINISTRADORA SOLICITADA
+
+Quiero configurar la siguiente cuenta con acceso administrativo institucional autorizado.
+
+Correo:
+
+`gamacondorilopez74@gmail.com`
+
+UID de Firebase Authentication:
+
+`0zHkg7u1XsaJ15EiXtVNzY8qTWt2`
+
+### PASO 1. Verificar existencia
+
+Comprueba mediante Firebase Authentication y un backend seguro que:
+
+- El UID existe realmente.
+- El correo coincide con ese UID.
+- La cuenta no está deshabilitada.
+- El correo está verificado cuando la política de seguridad lo requiera.
+- No existe un conflicto con un perfil institucional anterior.
+
+Si el UID no existe, informa de ello.
+
+Si el correo no coincide, detente y solicita corregir la identificación.
+
+No inventes ni simules una cuenta.
+
+### PASO 2. Comprobar administradores anteriores
+
+Los informes del proyecto contienen otros dos UID utilizados para Dirección:
+
+`At1j9MIIu1ZN0ZRZDas28ILQn2y1`
+
+`oVuD2FxNPqZbzBUfCzKPXc9t1V82`
+
+Antes de añadir la cuenta nueva, determina qué representan.
+
+Podrían corresponder a cuentas distintas, configuraciones anteriores o datos inconsistentes.
+
+No los sustituyas ni elimines automáticamente.
+
+Quiero un informe que identifique todas las condiciones que actualmente conceden privilegios de Dirección.
+
+### PASO 3. Asignar permisos
+
+Si se verifica la identidad y está autorizada la operación, registra la nueva cuenta con el rol institucional:
+
+`director`
+
+No crees un rol público llamado `superadmin`.
+
+Si existe una distinción técnica entre directora y administrador privilegiado, utiliza permisos administrativos protegidos y documentados, no un rol que pueda elegirse durante el registro público.
+
+La cuenta debe poder acceder a los módulos institucionales autorizados de SIGAE:
+
+- Panel de Dirección.
+- Usuarios registrados.
+- Profesores.
+- Estudiantes del padrón.
+- Cursos.
+- Matrículas.
+- Asignaciones docentes.
+- Horarios.
+- Asistencia.
+- Calificaciones.
+- Calendario institucional.
+- Mensajes.
+- Notificaciones.
+- Kárdex.
+- Solicitudes.
+- Configuración institucional.
+
+No significa que deba ignorar los controles de privacidad. Las acciones sensibles deben seguir teniendo autorización específica y auditoría.
+
+### PASO 4. Perfil institucional
+
+Relaciona el UID real con un único perfil canónico.
+
+Verifica la colección `/users` o la ruta institucional realmente vigente.
+
+Conserva:
+
+- UID.
+- Correo.
+- Rol.
+- Institución.
+- Estado de la cuenta.
+- Fecha de creación y actualización.
+- Permisos autorizados.
+
+No inventes nombre, carnet, teléfono u otros datos personales.
+
+Si ya existe un perfil, actualízalo de manera segura y sin duplicarlo.
+
+### PASO 5. Contraseña
+
+La contraseña se administra exclusivamente con Firebase Authentication.
+
+No quiero contraseñas guardadas en Firestore, Storage, código fuente, archivos de configuración ni logs.
+
+No incluyas contraseñas dentro del frontend.
+
+Si es necesario configurar o cambiar credenciales, utiliza un mecanismo seguro de Firebase.
+
+### PASO 6. Privilegios del servidor
+
+Si necesitas utilizar Firebase Admin SDK, realiza la operación en un entorno privilegiado.
+
+No coloques funciones para cambiar roles dentro de React.
+
+Si se necesitan custom claims para el acceso administrativo, configúralas desde el backend después de verificar la cuenta.
+
+No aceptes custom claims enviados desde el navegador.
+
+No restaures privilegios administrativos solamente porque el correo o UID coincida con una constante escrita en el frontend.
+
+## PARTE 3. CORREGIR LA AUTENTICACIÓN SIN CONEXIÓN
+
+En un informe anterior se indicó que SIGAE restauraba el perfil de Dirección cuando Firestore estaba desconectado.
+
+Quiero revisar esa solución porque puede introducir un problema de seguridad.
+
+### Comportamiento correcto
+
+Firebase Authentication puede mantener una sesión autenticada durante una interrupción de red.
+
+Sin embargo, una sesión autenticada no demuestra automáticamente que la cuenta tenga permisos administrativos vigentes.
+
+Por lo tanto:
+
+1. Conserva la sesión autenticada cuando sea apropiado.
+2. Diferencia el estado de autenticación del estado de autorización.
+3. Si no puedes confirmar permisos actualizados, restringe las operaciones protegidas.
+4. Muestra «Sin conexión» o «No se pudieron verificar los permisos».
+5. No generes un perfil administrativo provisional.
+6. No concedas permisos de Dirección por coincidencia de correo.
+7. Al recuperar la conexión, vuelve a verificar el perfil institucional.
+8. Limpia la información privada cuando cambie la cuenta autenticada.
+
+No permitas operaciones administrativas offline que no puedan verificarse de manera segura.
+
+Revisa especialmente:
+
+- `src/App.tsx`
+- `src/firebase/authService.ts`
+- `src/firebase/config.ts`
+
+El acceso debe permanecer seguro incluso cuando Firestore falle.
+
+## PARTE 4. ELIMINACIÓN DE USUARIOS Y DATOS FICTICIOS
+
+Este problema es prioritario.
+
+SIGAE está mostrando o generando estudiantes, usuarios y estadísticas que no corresponden necesariamente a registros reales.
+
+### Auditar la información existente
+
+Según el informe anterior, existían aproximadamente:
+
+- `/users`: 12 documentos.
+- `/teachers`: 7 documentos.
+- `/students`: 0 documentos.
+- `/schedules`: 48 documentos preliminares.
+- `/messages`: 3 documentos.
+
+Estos valores corresponden a un informe anterior y deben verificarse nuevamente.
+
+### Identificar datos de demostración
+
+Busca en el proyecto:
+
+- `mockUsers`.
+- `mockStudents`.
+- `dummyData`.
+- `sampleData`.
+- `seedData`.
+- `demoData`.
+- Usuarios hardcodeados.
+- Fotografías ficticias.
+- Estudiantes creados automáticamente.
+- Notas académicas de ejemplo.
+- Porcentajes inventados.
+- Asistencias simuladas.
+- Mensajes y notificaciones inventados.
+- Seeds automáticos ejecutados al abrir pantallas.
+
+No crees datos para rellenar una interfaz vacía.
+
+### Registro legítimo
+
+Solo deben aparecer como cuentas registradas las identidades válidas existentes en Firebase Authentication, relacionadas correctamente con sus perfiles institucionales.
+
+Diferencia claramente:
+
+**Cuenta de usuario:** identidad que inicia sesión.
+
+**Perfil institucional:** información autorizada asociada a esa identidad.
+
+**Expediente de estudiante:** registro escolar que puede existir aunque el estudiante todavía no tenga cuenta.
+
+**Matrícula:** relación del estudiante con curso y gestión.
+
+**Expediente de profesor:** registro institucional que puede requerir aprobación y una cuenta vinculada.
+
+No borres estudiantes legítimos del padrón porque todavía no tengan una cuenta de Authentication.
+
+### Comportamiento sin datos
+
+Si no existen profesores registrados, muestra:
+
+«Todavía no hay profesores registrados».
+
+Si no hay profesores aprobados:
+
+«No hay profesores aprobados».
+
+Si no existen matrículas:
+
+«No hay estudiantes matriculados».
+
+Si el curso no tiene notas:
+
+«Todavía no hay calificaciones registradas».
+
+Si no hay asistencias:
+
+«No existen registros de asistencia para este período».
+
+Si no existen mensajes:
+
+«No tienes mensajes».
+
+Si no hay eventos:
+
+«No hay actividades programadas».
+
+Si no hay datos suficientes para calcular un promedio:
+
+«Promedio no disponible».
+
+No muestres un promedio de 78,2 ni un porcentaje de asistencia inventado.
+
+### Limpieza de registros existentes
+
+Antes de eliminar datos sospechosos:
+
+1. Obtén su procedencia.
+2. Comprueba si tienen vínculos con registros reales.
+3. Verifica si fueron creados por pruebas.
+4. Presenta un listado de candidatos a depuración.
+5. Prepara una copia de seguridad.
+6. Solicita autorización explícita.
+
+No borres los 48 registros de `/schedules` ni los 12 perfiles solamente por considerarlos preliminares.
+
+No generes nuevos registros mientras se realiza la inspección.
+
+## PARTE 5. REVISIÓN COMPLETA DE FIRESTORE SECURITY RULES
+
+En informes anteriores se detectó que:
+
+- `/notifications`
+- `/calendar_events`
+- `/kardex_records`
+
+No tenían inicialmente permisos específicos y luego se realizaron algunas correcciones.
+
+Necesito verificar el estado REAL de las reglas actualmente desplegadas.
+
+### Problema importante de notificaciones
+
+Un informe indicó que la creación de documentos en `/notifications` estaba permitida para usuarios autenticados.
+
+Eso puede resultar demasiado amplio.
+
+No quiero que un estudiante o padre cree arbitrariamente una notificación fingiendo ser Dirección.
+
+La creación de notificaciones debe cumplir las reglas de autorización correspondientes al origen del aviso.
+
+Para notificaciones institucionales, de Kárdex o de envío masivo, utiliza preferiblemente operaciones backend validadas.
+
+El destinatario y el remitente deben resolverse de manera confiable.
+
+### Problema importante del calendario
+
+No permitas que cualquier usuario autenticado lea todos los eventos sin comprobar su ámbito.
+
+Un evento público institucional puede estar disponible para la comunidad autorizada.
+
+Pero una comunicación privada, actividad restringida o citación individual no debe mostrarse a usuarios ajenos.
+
+### Problema importante del Kárdex
+
+El Kárdex maneja información individual de estudiantes.
+
+Solo deben poder consultar registros:
+
+- Dirección autorizada.
+- Profesor responsable con permisos vigentes.
+- Padre o tutor con vínculo familiar aprobado, cuando el registro esté autorizado para comunicación.
+- Estudiante, únicamente cuando la institución permita esa consulta.
+
+No permitas lecturas abiertas de expedientes.
+
+### Entrega requerida
+
+Revisa todas las colecciones utilizadas por SIGAE.
+
+Entrega:
+
+1. El archivo `firestore.rules` corregido.
+2. Explicación de las reglas.
+3. Pruebas de permisos por rol.
+4. Índices necesarios.
+5. Operaciones que necesitan backend.
+6. Riesgos encontrados.
+7. Pasos de despliegue.
+
+No publiques las reglas sin mi autorización.
+
+## PARTE 6. REGLAS INDEPENDIENTES DE FIREBASE STORAGE
+
+He adjuntado una captura de:
+
+Firebase Console → Storage → Rules.
+
+También he proporcionado `Google_AI_Studio_Firebase_Guide.pdf`, cuya página 6 presenta un ejemplo de reglas Storage con carpetas por usuario y una cuenta administradora.
+
+Quiero que prepares la configuración real de almacenamiento para SIGAE.
+
+### Antes de escribir reglas
+
+Verifica:
+
+- Bucket activo.
+- Proyecto Firebase correcto.
+- Rutas de subida usadas en React.
+- Servicios de almacenamiento.
+- Archivos existentes.
+- Tipos de archivos utilizados.
+- Operaciones de lectura y escritura.
+- Si existe una base Firestore predeterminada o con ID personalizado.
+
+### Archivos privados de usuarios
+
+Los propietarios deben poder acceder a sus propios archivos cuando estén autorizados.
+
+La cuenta administradora verificada puede recibir permisos especiales de consulta conforme a la política institucional.
+
+No permitas que un usuario consulte automáticamente archivos privados de otro.
+
+### Archivos académicos compartidos
+
+Prepara reglas específicas para:
+
+- Materiales del profesor.
+- Adjuntos de mensajes.
+- Comunicados.
+- Documentos de estudiantes.
+- Archivos de actividades.
+- Documentos institucionales.
+
+Cada archivo compartido debe tener una política de destinatarios.
+
+No concedas acceso general a todos los archivos simplemente por estar autenticado.
+
+### Validaciones
+
+Incluye controles razonables de:
+
+- Tamaño máximo.
+- Tipos de archivos.
+- Propietario.
+- Permisos de lectura.
+- Permisos de escritura.
+- Eliminación autorizada.
+
+No confíes únicamente en el tipo MIME proporcionado por el navegador cuando se trate de archivos que requieran validación fuerte.
+
+### Requisito de entrega
+
+Necesito que me entregues el código exacto para pegar en:
+
+Firebase Console → Storage → Rules.
+
+Ese código debe estar adaptado al bucket y a las rutas verdaderas de SIGAE.
+
+No confundas las reglas de Storage con las reglas de Firestore.
+
+No publiques ni afirmes que publicaste reglas si la operación no se realizó.
+
+## PARTE 7. RECUPERAR LAS MEJORES IDEAS DE LAS IMÁGENES ANTIGUAS
+
+He adjuntado cinco imágenes antiguas del diseño conceptual de SIGAE.
+
+No quiero que las copies literalmente.
+
+Quiero que recuperes sus funciones útiles y las adaptes a la arquitectura actual.
+
+### A. Panel del profesor
+
+Incorpora una estructura de cuaderno digital con:
+
+- Portada del curso.
+- Lista de estudiantes.
+- Calificaciones por materia.
+- Hoja General.
+- Hoja Saber–Hacer–Decidir.
+- Hoja Trimestral.
+- Hoja Anual.
+- Asistencia.
+- Kárdex.
+- Comunicaciones.
+
+Las hojas deben corresponder al sistema de evaluación realmente aprobado por la institución.
+
+No inventes fórmulas, ponderaciones o promedios.
+
+El profesor solo podrá modificar notas de materias y cursos oficialmente asignados.
+
+Las calificaciones deben guardarse en Firestore, con historial de cambios y publicación controlada.
+
+### B. Panel de Dirección
+
+Recupera:
+
+- Agenda institucional.
+- Calendario mensual y semanal.
+- Gestión de profesores.
+- Gestión de estudiantes.
+- Horarios.
+- Comunicados institucionales.
+- Invitaciones a reuniones.
+- Confirmaciones de lectura.
+- Estadísticas basadas en datos reales.
+
+No crees un calendario duplicado si ya existe `UnifiedSchoolCalendar`.
+
+Mejora el componente actual.
+
+### C. Kárdex
+
+Recupera la idea de alertas visuales.
+
+Pero utiliza los cuatro niveles de seguimiento definidos para SIGAE:
+
+1. Informativo.
+2. Llamada de atención.
+3. Atención familiar.
+4. Prioritario.
+
+El profesor debe elegir la categoría y describir objetivamente lo ocurrido.
+
+Ejemplos de categorías:
+
+- Tarea no presentada.
+- Observación de convivencia.
+- Incumplimiento de acuerdo.
+- Seguimiento.
+- Reconocimiento positivo.
+- Solicitud de reunión.
+
+No conviertas automáticamente una nota baja o una tarea pendiente en una sanción.
+
+No publiques observaciones privadas en calendarios generales.
+
+### D. Panel del padre
+
+Recupera una portada académica con:
+
+- Hijo seleccionado.
+- Curso y paralelo.
+- Horario.
+- Materias.
+- Calificaciones publicadas.
+- Asistencia.
+- Kárdex comunicable.
+- Próximas actividades.
+- Notificaciones.
+- Mensajes con profesores.
+- Citaciones.
+
+Si el padre tiene varios hijos, debe poder cambiar entre ellos.
+
+No mezcles datos de hijos diferentes.
+
+Los padres no podrán modificar calificaciones, asistencia ni registros docentes.
+
+### E. Calendario familiar
+
+Recupera:
+
+- Vista mensual.
+- Vista semanal.
+- Eventos escolares.
+- Reuniones.
+- Feriados verificados.
+- Actividades del curso.
+- Mensajes.
+- Confirmaciones de lectura.
+- Respuestas autorizadas.
+
+Al seleccionar una fecha se deben mostrar sus eventos reales.
+
+No inventes feriados, fechas o reuniones.
+
+### F. Mejoras de diseño
+
+Conserva la identidad visual de SIGAE y modernízala.
+
+Utiliza las imágenes antiguas como referencia funcional, no como plantilla exacta.
+
+Corrige:
+
+- Etiquetas de roles equivocadas.
+- Tablas poco legibles.
+- Datos repetidos.
+- Porcentajes inexistentes.
+- Botones redundantes.
+- Alertas excesivas.
+- Calendarios con fechas incorrectas.
+- Información personal expuesta innecesariamente.
+
+Quiero un diseño escolar profesional, moderno y fácil de utilizar tanto en teléfonos como en computadoras.
+
+## PARTE 8. MEJORAR EL CALENDARIO ACTUAL
+
+El informe indica que existe:
+
+`UnifiedSchoolCalendar.tsx`
+
+No lo reconstruyas innecesariamente.
+
+Inspecciona y mejora:
+
+- Vista mensual.
+- Vista semanal.
+- Navegación entre fechas.
+- Selector de curso.
+- Selector de hijo.
+- Calendario institucional.
+- Actividades y evaluaciones.
+- Comunicaciones.
+- Colores según el rol del remitente.
+- Fechas de envío y fechas del evento separadas.
+
+### Vista semanal del padre
+
+Debe mostrar claramente:
+
+**Clases**
+
+- Materia.
+- Profesor.
+- Período u hora verificada.
+
+**Actividades**
+
+- Tareas.
+- Evaluaciones.
+- Reuniones.
+
+**Comunicaciones**
+
+- Quién envió el mensaje.
+- Rol.
+- Fecha.
+- Estado de lectura.
+
+El calendario debe consultar el horario oficial del curso del hijo seleccionado.
+
+No mostrar materias de otros paralelos.
+
+Si el horario oficial no ha sido publicado, mostrar «Horario pendiente de confirmación».
+
+### Horarios de los 24 cursos
+
+Utiliza el archivo oficial clasificado:
+
+`SIGAE_horarios_por_curso.xlsx`
+
+Si no está disponible en el entorno, informa que debe adjuntarse.
+
+No inventes horarios de los 23 cursos que aún no hayan sido importados.
+
+Revisa también los conflictos detectados en 4.º B y 6.º C.
+
+## PARTE 9. MENSAJERÍA Y NOTIFICACIONES
+
+Conserva `NewCommunicationModal` y `NotificationBellDropdown`.
+
+Quiero:
+
+- Selección de destinatario individual.
+- Selección múltiple autorizada.
+- Selección de grupos.
+- Envío a profesores.
+- Envío a padres vinculados.
+- Envío a estudiantes autorizados.
+- Comunicados de Dirección.
+- Envío programado.
+- Pantalla de confirmación obligatoria.
+- Historial.
+- Lectura individual.
+- Respuesta cuando esté permitida.
+
+### Confirmación
+
+Antes del envío mostrar:
+
+**¿Estás seguro de enviar este mensaje?**
+
+Incluye:
+
+- Título.
+- Remitente real.
+- Destinatarios autorizados.
+- Cantidad real.
+- Fecha.
+- Hora.
+- Prioridad.
+
+Botones:
+
+- Volver y editar.
+- Confirmar envío.
+
+No enviar antes de confirmar.
+
+### Diferenciar estados
+
+No confundas:
+
+- Guardado.
+- Programado.
+- Procesado.
+- Enviado.
+- Entregado.
+- Leído.
+- Respondido.
+
+Un mensaje privado solamente debe aparecer en los historiales de sus participantes autorizados.
+
+## PARTE 10. CONECTAR TODOS LOS MÓDULOS
+
+Quiero que SIGAE mantenga una estructura coherente:
+
+Institución
+→ Gestión
+→ Cursos
+→ Matrículas
+→ Estudiantes.
+
+Profesores
+→ Asignaciones
+→ Materias
+→ Horarios
+→ Asistencia y notas.
+
+Padres
+→ Vínculos aprobados
+→ Hijos
+→ Información académica.
+
+Calendario
+→ Eventos
+→ Cursos y materias.
+
+Kárdex
+→ Estudiante
+→ Observación
+→ Seguimiento
+→ Notificación familiar.
+
+Mensajes
+→ Remitentes
+→ Destinatarios
+→ Estados de lectura.
+
+Archivos
+→ Propietario
+→ Recurso académico
+→ Permisos de Storage.
+
+No dupliques datos académicos en múltiples colecciones sin necesidad.
+
+## PARTE 11. PRUEBAS
+
+Debes comprobar realmente:
+
+1. La cuenta administradora indicada y su UID.
+2. La existencia de los administradores anteriores.
+3. La ausencia de autoescalamiento de privilegios.
+4. La correcta selección del proyecto Firebase.
+5. La conexión a Firestore.
+6. La conexión a Storage.
+7. La creación de cuentas reales.
+8. La desaparición de datos ficticios de la interfaz de producción.
+9. La conservación de registros legítimos.
+10. El funcionamiento de las reglas por rol.
+11. La protección de documentos privados.
+12. La lectura y escritura de archivos autorizados.
+13. La separación de datos entre familias.
+14. El funcionamiento de horarios.
+15. El calendario mensual y semanal.
+16. Las calificaciones y sus permisos.
+17. La asistencia.
+18. Las observaciones del Kárdex.
+19. El envío y lectura de notificaciones.
+20. El funcionamiento del cierre de sesión y los estados sin conexión.
+
+Utiliza datos ficticios solamente en un entorno de pruebas aislado, nunca como datos académicos reales.
+
+No envíes mensajes de prueba a familias reales.
+
+No afirmes que una función está verificada únicamente porque se compiló.
+
+## PARTE 12. CHECKPOINTS
+
+### CHECKPOINT 1 — Identidades y proyectos
+
+Verifica proyecto Firebase, base Firestore, bucket Storage, UID administrativo y directores anteriores.
+
+### CHECKPOINT 2 — Seguridad
+
+Corrige cualquier mecanismo de privilegios administrativos basado únicamente en variables del navegador.
+
+### CHECKPOINT 3 — Usuarios reales
+
+Identifica y desactiva la generación automática de usuarios ficticios en producción.
+
+No borres datos reales sin aprobación.
+
+### CHECKPOINT 4 — Firestore
+
+Audita todas las reglas, prepara correcciones y pruebas.
+
+### CHECKPOINT 5 — Storage
+
+Inspecciona el bucket y las rutas, prepara las reglas exactas para publicación manual.
+
+### CHECKPOINT 6 — Diseño académico
+
+Mejora los paneles siguiendo las mejores ideas de las imágenes antiguas, sin copiar sus datos de ejemplo.
+
+### CHECKPOINT 7 — Calendario
+
+Mejora vistas, horarios, eventos, mensajes y notificaciones.
+
+### CHECKPOINT 8 — Integración
+
+Comprueba que todos los módulos utilicen Firebase y compartan relaciones académicas correctas.
+
+### CHECKPOINT 9 — Pruebas
+
+Ejecuta pruebas unitarias, de integración, reglas y navegación móvil.
+
+### CHECKPOINT 10 — Entrega
+
+Prepara un informe completo de cambios y riesgos.
+
+## FORMATO DEL INFORME FINAL
+
+Después de cada checkpoint, indica:
+
+- Archivos revisados.
+- Problemas confirmados.
+- Archivos modificados.
+- Colecciones consultadas.
+- Colecciones modificadas.
+- Reglas revisadas.
+- Pruebas ejecutadas.
+- Resultados.
+- Riesgos restantes.
+- Acciones que requieren aprobación.
+
+Diferencia:
+
+VERIFICADO: probado realmente.
+
+IMPLEMENTADO: desarrollado, pero todavía sujeto a validación adicional.
+
+PENDIENTE: falta completarlo.
+
+PROPUESTO: todavía no existe.
+
+## RESTRICCIONES OBLIGATORIAS
+
+No debes:
+
+- Reconstruir SIGAE desde cero.
+- Inventar usuarios.
+- Generar estudiantes falsos.
+- Crear notas de demostración en producción.
+- Modificar contraseñas desde Firestore.
+- Conceder roles administrativos basándote solo en el navegador.
+- Modificar permisos de otros usuarios sin autorización.
+- Publicar reglas inseguras.
+- Borrar estudiantes reales.
+- Sobrescribir horarios oficiales.
+- Crear mensajes falsos.
+- Activar servicios facturables sin autorización.
+- Ejecutar operaciones destructivas sin respaldo y aprobación.
+
+## INSTRUCCIÓN FINAL
+
+Comienza verificando la cuenta administrativa:
+
+Correo: `gamacondorilopez74@gmail.com`
+
+UID: `0zHkg7u1XsaJ15EiXtVNzY8qTWt2`
+
+Comprueba su identidad y su relación con el proyecto Firebase antes de concederle acceso institucional.
+
+Revisa los otros UID de Dirección para evitar conflictos.
+
+Corrige prioritariamente cualquier autorización administrativa basada en perfiles provisionales o valores del navegador.
+
+Después identifica los usuarios ficticios y elimina su generación automática en producción, manteniendo intactos los expedientes y las cuentas legítimas.
+
+Finalmente, prepara las reglas exactas de Firestore y Storage y mejora los paneles, el calendario, el cuaderno docente y el seguimiento familiar basándote en las imágenes antiguas.
+
+**QUIERO QUE SIGAE SEA UN SISTEMA ACADÉMICO REAL, SEGURO, FÁCIL DE UTILIZAR Y CONECTADO CORRECTAMENTE A FIREBASE. NO UNA DEMOSTRACIÓN CON DATOS INVENTADOS.**

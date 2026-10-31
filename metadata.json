@@ -1,0 +1,6 @@
+{
+  "name": "EduColegio Privado & Sentiment Analytics",
+  "description": "Sistema privado de gestión escolar con registro y base de datos para profesores, alumnos y padres con reportes de calificaciones en tiempo real, portal docente de alta seguridad y Customer/Community Sentiment Dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
